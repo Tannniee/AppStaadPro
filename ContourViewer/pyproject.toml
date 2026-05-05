@@ -1,0 +1,25 @@
+[project]
+name = "contour-viewer"
+version = "0.1.0"
+description = "Standalone STAAD contour viewer shell."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "PySide6_Essentials>=6.7,<7",
+    "pyvista>=0.47,<0.48",
+    "pyvistaqt>=0.11,<0.12",
+    "pywin32>=306",
+]
+
+[project.scripts]
+contour-viewer = "contour_viewer.app:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

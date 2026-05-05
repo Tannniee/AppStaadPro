@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Authors>Antigravity</Authors>
+    <Product>StaadSteelApp</Product>
+    <AssemblyName>StaadSteelApp</AssemblyName>
+    <RootNamespace>StaadSteelApp</RootNamespace>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Legacy typed reference removed -->
+    <PackageReference Include="Microsoft.Office.Interop.Excel" Version="15.0.4795.1001" />
+    <PackageReference Include="System.Data.SQLite.Core" Version="1.0.119" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="StaadResetTool\**\*.cs" />
+    <EmbeddedResource Remove="StaadResetTool\**\*" />
+    <None Remove="StaadResetTool\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="setup-legacy-sections.cmd">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Forms/AdvanceAlignForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms/AdvanceAlignForm.Designer.cs">
+      <DependentUpon>AdvanceAlignForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms/AssignLoadForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms/AssignLoadForm.Designer.cs">
+      <DependentUpon>AssignLoadForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms/CheckForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms/CheckForm.Designer.cs">
+      <DependentUpon>CheckForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms/LoadTreeForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms/LoadTreeForm.Designer.cs">
+      <DependentUpon>LoadTreeForm.cs</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+
+</Project>

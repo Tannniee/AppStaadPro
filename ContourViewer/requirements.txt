@@ -1,0 +1,5 @@
+PySide6_Essentials>=6.7,<7
+pyvista>=0.47,<0.48
+pyvistaqt>=0.11,<0.12
+pywin32>=306
+pyinstaller>=6.19

@@ -1,0 +1,32 @@
+﻿using System;
+using System.Globalization;
+
+namespace StaadSteelApp.Core.Interop
+{
+    internal static partial class OpenStaadSelectionAdapter
+    {
+        private static int? TryGetHiddenEntitiesFlag(object geometry)
+        {
+            try
+            {
+                object result = ComInvoke.Invoke(geometry, "GetFlagForHiddenEntities");
+                return Convert.ToInt32(result, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void TrySetHiddenEntitiesFlag(object geometry, int flagValue)
+        {
+            try
+            {
+                ComInvoke.Invoke(geometry, "SetFlagForHiddenEntities", new object[] { flagValue });
+            }
+            catch
+            {
+            }
+        }
+    }
+}

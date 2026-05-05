@@ -1,0 +1,41 @@
+# ============================================
+# STAAD APP - Git Ignore
+# ============================================
+
+# --- .NET / Visual Studio ---
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.log
+*.tmp
+
+# --- Build temp ---
+.tmp/
+.dotnet/
+
+# --- Runtime settings (personal to each machine) ---
+settings.ini
+
+# --- OpenSTAAD API Docs (too large, not source code) ---
+OSAPP_Help/
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# --- ContourViewer build artifacts ---
+ContourViewer/build/
+ContourViewer/dist/
+ContourViewer/scratch/
+ContourViewer/*.spec
+
+# --- OS junk ---
+Thumbs.db
+Desktop.ini
+.DS_Store
