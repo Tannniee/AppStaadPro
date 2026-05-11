@@ -16,7 +16,10 @@ namespace StaadSteelApp.Core
                 return;
 
             Debug.WriteLine(ex == null ? message : (message + " | " + ex));
-            StaadSteelApp.TopMostMessageBox.ShowWarning(ex == null ? message : (message + "\n" + ex.Message), "STAAD Warning");
+            if (ex == null)
+                AppLogger.Warning(message);
+            else
+                AppLogger.Exception(message, ex);
         }
 
     }

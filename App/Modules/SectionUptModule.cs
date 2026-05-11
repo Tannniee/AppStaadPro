@@ -1,13 +1,11 @@
 using System;
-using System.Collections.Generic;
-using System.Threading;
 using StaadSteelApp.Core.Interop;
 
 namespace StaadSteelApp.Core
 {
-    internal static class SectionUptModule
+    internal static partial class SectionUptModule
     {
-        internal static int GetOrCreateUPTSection(dynamic os, SectionInfo info, Func<dynamic, string, int> checkPropertyExists)
+        internal static int GetOrCreateUPTSection(object os, SectionInfo info, Func<object, string, int> checkPropertyExists)
         {
             int tableType = 0;
             switch (info.PropType)
@@ -24,11 +22,12 @@ namespace StaadSteelApp.Core
                 case eFramePropType.Prismatic: tableType = 10; break; // Prismatic
                 case eFramePropType.Circle: tableType = 10; break; // Prismatic for circle
                 default:
-                    throw new Exception($"Cannot create UPT for property type {info.PropType}");
+                    throw new SectionPropertyException($"Cannot create UPT for property type {info.PropType}");
             }
 
             int tableId = GetOrCreateUPTTableId(os, tableType);
-            object propertyObj = os.Property;
+            if (!OpenStaadPropertyAdapter.TryGetPropertyObject(os, out object propertyObj, out string propertyError))
+                throw new SectionPropertyException(propertyError);
 
             // Check if name already exists
             int existingProperty = checkPropertyExists(os, info.Name);
@@ -58,7 +57,7 @@ namespace StaadSteelApp.Core
             {
                 case 1: // WIDE FLANGE
                     if (D <= 0.0 || Tw <= 0.0 || Wf <= 0.0 || Tf <= 0.0)
-                        throw new Exception($"UPT WIDE FLANGE '{info.Name}' requires D/TW/WF/TF > 0.");
+                        throw new SectionPropertyException($"UPT WIDE FLANGE '{info.Name}' requires D/TW/WF/TF > 0.");
                     double wideWebH = Math.Max(D - (2.0 * Tf), 0.0);
                     double wideArea = (2.0 * Wf * Tf) + (wideWebH * Tw);
                     double wideIzApprox = (2.0 * Wf * Math.Pow(Tf, 3) + wideWebH * Math.Pow(Tw, 3)) / 3.0;
@@ -77,7 +76,7 @@ namespace StaadSteelApp.Core
                     break;
                 case 2: // CHANNEL
                     if (D <= 0.0 || Tw <= 0.0 || Wf <= 0.0 || Tf <= 0.0)
-                        throw new Exception($"UPT CHANNEL '{info.Name}' requires D/TW/WF/TF > 0.");
+                        throw new SectionPropertyException($"UPT CHANNEL '{info.Name}' requires D/TW/WF/TF > 0.");
                     double channelWebH = Math.Max(D - (2.0 * Tf), 0.0);
                     double channelArea = (2.0 * Wf * Tf) + (channelWebH * Tw);
                     double channelIzApprox = (2.0 * Wf * Math.Pow(Tf, 3) + channelWebH * Math.Pow(Tw, 3)) / 3.0;
@@ -96,7 +95,7 @@ namespace StaadSteelApp.Core
                     break;
                 case 3: // ANGLE
                     if (D <= 0.0 || Wf <= 0.0 || Tf <= 0.0)
-                        throw new Exception($"UPT ANGLE '{info.Name}' requires D/WF/TF > 0.");
+                        throw new SectionPropertyException($"UPT ANGLE '{info.Name}' requires D/WF/TF > 0.");
                     double angleArea = Tf * Math.Max((D + Wf - Tf), 0.0);
                     double angleAy = PositiveOrFallback(info.UptAy, 0.5 * angleArea, 1e-12);
                     double angleAz = PositiveOrFallback(info.UptAz, 0.5 * angleArea, 1e-12);
@@ -105,9 +104,9 @@ namespace StaadSteelApp.Core
                     break;
                 case 4: // DOUBLE ANGLE
                     if (D <= 0.0 || Wf <= 0.0 || Tf <= 0.0)
-                        throw new Exception($"UPT DOUBLE ANGLE '{info.Name}' requires D/WF/TF > 0.");
+                        throw new SectionPropertyException($"UPT DOUBLE ANGLE '{info.Name}' requires D/WF/TF > 0.");
                     if (spc < 0.0)
-                        throw new Exception($"UPT DOUBLE ANGLE '{info.Name}' requires SP >= 0.");
+                        throw new SectionPropertyException($"UPT DOUBLE ANGLE '{info.Name}' requires SP >= 0.");
                     double dblAngleArea = 2.0 * Tf * Math.Max((D + Wf - Tf), 0.0);
                     double dblAngleIz = info.UptIz > 0.0 ? info.UptIz : 0.0;
                     double dblAngleIy = info.UptIy > 0.0 ? info.UptIy : 0.0;
@@ -119,7 +118,7 @@ namespace StaadSteelApp.Core
                     break;
                 case 5: // TEE
                     if (D <= 0.0 || Wf <= 0.0 || Tf <= 0.0 || Tw <= 0.0)
-                        throw new Exception($"UPT TEE '{info.Name}' requires D/WF/TF/TW > 0.");
+                        throw new SectionPropertyException($"UPT TEE '{info.Name}' requires D/WF/TF/TW > 0.");
                     double teeWebH = Math.Max(D - Tf, 0.0);
                     double teeArea = (Wf * Tf) + (teeWebH * Tw);
                     double yFlange = D - (Tf * 0.5);
@@ -141,7 +140,7 @@ namespace StaadSteelApp.Core
                     break;
                 case 6: // PIPE
                     if (OD <= 0.0 || ID <= 0.0 || ID >= OD)
-                        throw new Exception($"UPT PIPE '{info.Name}' requires OD > ID > 0.");
+                        throw new SectionPropertyException($"UPT PIPE '{info.Name}' requires OD > ID > 0.");
                     double pipeArea = (Math.PI / 4.0) * (OD * OD - ID * ID);
                     double pipeAy = PositiveOrFallback(info.UptAy, 0.5 * pipeArea, 1e-12);
                     double pipeAz = PositiveOrFallback(info.UptAz, 0.5 * pipeArea, 1e-12);
@@ -150,9 +149,9 @@ namespace StaadSteelApp.Core
                     break;
                 case 7: // TUBE
                     if (tubeD <= 0.0 || tubeWf <= 0.0 || Tf <= 0.0)
-                        throw new Exception($"UPT TUBE '{info.Name}' requires D/WF/TF > 0.");
+                        throw new SectionPropertyException($"UPT TUBE '{info.Name}' requires D/WF/TF > 0.");
                     if ((2.0 * Tf) >= Math.Min(tubeD, tubeWf))
-                        throw new Exception($"UPT TUBE '{info.Name}' requires TF < min(D,WF)/2.");
+                        throw new SectionPropertyException($"UPT TUBE '{info.Name}' requires TF < min(D,WF)/2.");
                     double innerD = tubeD - (2.0 * Tf);
                     double innerWf = tubeWf - (2.0 * Tf);
                     double tubeArea = (tubeD * tubeWf) - (innerD * innerWf);
@@ -170,7 +169,7 @@ namespace StaadSteelApp.Core
                     break;
                 case 8: // GENERAL
                     if (D <= 0.0 || generalB <= 0.0 || Tw <= 0.0 || Tf <= 0.0)
-                        throw new Exception($"UPT GENERAL '{info.Name}' requires D/B/TD/TB > 0.");
+                        throw new SectionPropertyException($"UPT GENERAL '{info.Name}' requires D/B/TD/TB > 0.");
                     double generalDepth = D;
                     double generalWidth = generalB;
                     double generalTd = Tw;
@@ -194,7 +193,7 @@ namespace StaadSteelApp.Core
                     break;
                 case 9: // ISECTION
                     if (D <= 0.0 || Tw <= 0.0 || D1 <= 0.0 || Wf <= 0.0 || Tf <= 0.0 || Wf1 <= 0.0 || Tf1 <= 0.0)
-                        throw new Exception($"UPT ISECTION '{info.Name}' requires DWW/TWW/DWW1/BFF/TFF/BFF1/TFF1 > 0.");
+                        throw new SectionPropertyException($"UPT ISECTION '{info.Name}' requires DWW/TWW/DWW1/BFF/TFF/BFF1/TFF1 > 0.");
                     double iArea = (Wf * Tf) + (Wf1 * Tf1) + (Math.Max(((D + D1) * 0.5) - Tf - Tf1, 0.0) * Tw);
                     double iAx = PositiveOrFallback(info.UptAx, iArea, 1e-12);
                     double iAyf = PositiveOrFallback(info.UptAy, (5.0 / 6.0) * iAx, 1e-12);
@@ -204,7 +203,7 @@ namespace StaadSteelApp.Core
                     break;
                 case 10: // PRISMATIC
                     if (prismaticYD <= 0.0 || prismaticZD <= 0.0)
-                        throw new Exception($"UPT PRISMATIC '{info.Name}' requires YD/ZD > 0.");
+                        throw new SectionPropertyException($"UPT PRISMATIC '{info.Name}' requires YD/ZD > 0.");
                     double prismaticDepth = prismaticYD;
                     double prismaticWidth = prismaticZD;
                     double prismaticAreaRect = prismaticDepth * prismaticWidth;
@@ -232,198 +231,11 @@ namespace StaadSteelApp.Core
 
             if (!IsUptSectionAddSuccess(createResult))
             {
-                throw new Exception($"Failed to add UPT section '{info.Name}'. OpenSTAAD returned {createResult ?? "null"}.");
+                throw new SectionPropertyException($"Failed to add UPT section '{info.Name}'. OpenSTAAD returned {createResult ?? "null"}.");
             }
 
-            throw new Exception($"UPT section '{info.Name}' was added to table {tableId} but no section property ID could be created from it.");
+            throw new SectionPropertyException($"UPT section '{info.Name}' was added to table {tableId} but no section property ID could be created from it.");
         }
 
-        private static int GetOrCreateUPTTableId(dynamic os, int targetType)
-        {
-            object propObjForTables = os.Property;
-            int tableCount = OpenStaadPropertyAdapter.GetUserProvidedTableCount(propObjForTables, out _);
-            HashSet<int> existingIds = new HashSet<int>();
-            int preferredTableId = GetPreferredUPTTableId(targetType);
-
-            if (tableCount > 0)
-            {
-                int[] existingTables = OpenStaadPropertyAdapter.TryGetUserProvidedTableList(propObjForTables, tableCount, out int[] tableIds, out _)
-                    ? tableIds
-                    : Array.Empty<int>();
-
-                foreach (int tableId in existingTables)
-                {
-                    existingIds.Add(tableId);
-                    if (TryGetUPTTableSectionType(propObjForTables, tableId, out int currentType) && currentType == targetType)
-                    {
-                        return tableId;
-                    }
-
-                    // Keep one stable table per section type for app-created UPT tables.
-                    // If STAAD cannot report the table section type reliably, fall back to
-                    // the reserved table id for that section type instead of creating duplicates.
-                    if (preferredTableId > 0 && tableId == preferredTableId)
-                        return tableId;
-                }
-            }
-
-            if (preferredTableId > 0 && !existingIds.Contains(preferredTableId))
-            {
-                OpenStaadPropertyAdapter.TryCreateUPTTableEx(propObjForTables, preferredTableId, targetType, out _);
-                return preferredTableId;
-            }
-
-            for (int newId = 1; newId <= 99; newId++)
-            {
-                if (!existingIds.Contains(newId))
-                {
-                    OpenStaadPropertyAdapter.TryCreateUPTTableEx(propObjForTables, newId, targetType, out _);
-                    return newId;
-                }
-            }
-
-            throw new Exception("Maximum Number of UPT Tables (99) reached.");
-        }
-
-        private static int GetPreferredUPTTableId(int targetType)
-        {
-            if (targetType >= 1 && targetType <= 10)
-                return targetType;
-
-            return 0;
-        }
-
-        private static int GetUPTTableSectionType(object property, int tableId)
-        {
-            if (OpenStaadPropertyAdapter.TryGetUserProvidedTableSectionType(property, tableId, out int sectionType, out string error))
-                return sectionType;
-
-            throw new Exception(error);
-        }
-
-        private static bool TryGetUPTTableSectionType(object property, int tableId, out int sectionType)
-        {
-            sectionType = 0;
-
-            try
-            {
-                sectionType = GetUPTTableSectionType(property, tableId);
-                return sectionType > 0;
-            }
-            catch (Exception)
-            {
-                sectionType = 0;
-                return false;
-            }
-        }
-
-        private static bool IsUptSectionAddSuccess(object ret)
-        {
-            if (ret == null) return false;
-            if (ret is bool b) return !b;
-            if (ret is int i) return i == 0 || i == -6045;
-            if (ret is short s) return s == 0 || s == -6045;
-            try
-            {
-                int value = Convert.ToInt32(ret);
-                return value == 0 || value == -6045;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        private static int FindPropertyIdByNameWithRetry(
-            dynamic os,
-            string propertyName,
-            Func<dynamic, string, int> checkPropertyExists,
-            int attempts,
-            int delayMs)
-        {
-            if (os == null || string.IsNullOrWhiteSpace(propertyName) || checkPropertyExists == null)
-                return 0;
-
-            string target = propertyName.Trim();
-            for (int i = 0; i < attempts; i++)
-            {
-                int id = 0;
-                try
-                {
-                    id = checkPropertyExists(os, target);
-                }
-                catch (Exception)
-                {
-                    id = 0;
-                }
-
-                if (id > 0) return id;
-
-                if (i < attempts - 1)
-                    Thread.Sleep(delayMs);
-            }
-
-            return 0;
-        }
-
-        private static int CreatePropertyFromUptTable(object property, int tableId, string sectionName)
-        {
-            if (property == null || tableId <= 0 || string.IsNullOrWhiteSpace(sectionName))
-                return 0;
-
-            string baseName = sectionName.Trim();
-            string[] candidateNames = new[]
-            {
-                baseName,
-                "UPT " + baseName
-            };
-
-            foreach (string candidate in candidateNames)
-            {
-                int propId = OpenStaadPropertyAdapter.CreatePropertyFromUPTTable(property, tableId, candidate, out _);
-                if (propId > 0) return propId;
-            }
-
-            return 0;
-        }
-
-        private static double PositiveOrFallback(double value, double fallback, double minimum)
-        {
-            if (value > minimum) return value;
-            if (fallback > minimum) return fallback;
-            return minimum;
-        }
-
-        private static double ComputeRectangularTorsionConstant(double depth, double width)
-        {
-            if (depth <= 0.0 || width <= 0.0)
-                return 0.0;
-
-            double a = Math.Max(depth, width);
-            double b = Math.Min(depth, width);
-            double ratio = b / a;
-            double term = (1.0 / 3.0) - (0.21 * ratio * (1.0 - (Math.Pow(ratio, 4) / 12.0)));
-            if (term <= 0.0) term = 1.0 / 12.0;
-
-            return a * Math.Pow(b, 3) * term;
-        }
-
-        private static double ComputeThinWalledClosedBoxTorsionConstant(double depth, double width, double thickness)
-        {
-            if (depth <= 0.0 || width <= 0.0 || thickness <= 0.0)
-                return 0.0;
-
-            double meanDepth = depth - thickness;
-            double meanWidth = width - thickness;
-            if (meanDepth <= 0.0 || meanWidth <= 0.0)
-                return 0.0;
-
-            double meanArea = meanDepth * meanWidth;
-            double meanPerimeter = 2.0 * (meanDepth + meanWidth);
-            if (meanPerimeter <= 0.0)
-                return 0.0;
-
-            return (4.0 * meanArea * meanArea * thickness) / meanPerimeter;
-        }
     }
 }

@@ -6,39 +6,50 @@ namespace StaadSteelApp.Core
 {
     public static partial class SectionService
     {
-        public static void SelectSameSection_DetectAll()
+        public static ServiceOperationResult SelectSameSection_DetectAll(object openStaad = null)
         {
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null) return;
+            if (openStaad == null && !TryGetSectionOpenStaad(out openStaad, out string connectionError))
+            {
+                Debug.WriteLine(connectionError);
+                return ServiceOperationResult.Error("Connection Error", connectionError);
+            }
 
-            int[] arrBeams = GetSelectedBeamIDs(os.Geometry);
+            if (!TryGetSectionGeometry(openStaad, out object geometryObj, out string geometryError))
+            {
+                Debug.WriteLine(geometryError);
+                return ServiceOperationResult.Error("Geometry Missing", geometryError);
+            }
+
+            int[] arrBeams = GetSelectedBeamIDs(geometryObj);
             if (arrBeams.Length == 0)
             {
-                StaadSteelApp.TopMostMessageBox.ShowInfo("Please select a source member (beam/physical member).", "Select Beam");
-                return;
+                return ServiceOperationResult.Info(
+                    "Select Beam",
+                    "Please select a source member (beam/physical member).");
             }
 
-            if (!TryResolveSourceBeamProperty(os, arrBeams, out int sourceID, out int propID))
+            if (!TryGetSectionProperty(openStaad, out object propObj, out string propertyError))
             {
-                StaadSteelApp.TopMostMessageBox.ShowError("Selected beam has no property.", "Property Missing");
-                return;
+                return ServiceOperationResult.Error("Property Missing", propertyError);
             }
 
-            object propObj = os.Property;
+            if (!TryResolveSourceBeamProperty(openStaad, propObj, arrBeams, out int sourceID, out int propID))
+            {
+                return ServiceOperationResult.Error("Property Missing", "Selected beam has no property.");
+            }
+
             if (!OpenStaadPropertyAdapter.TryGetSectionPropertyAssignedBeamCount(propObj, propID, out int count, out string countError))
             {
-                StaadSteelApp.TopMostMessageBox.ShowError(
-                    $"Could not read assigned beam count for property {propID}: {countError}",
-                    "Detect All Error");
-                return;
+                return ServiceOperationResult.Error(
+                    "Detect All Error",
+                    $"Could not read assigned beam count for property {propID}: {countError}");
             }
 
             if (count <= 0)
             {
-                StaadSteelApp.TopMostMessageBox.ShowInfo(
-                    $"Property {propID} has no assigned analytical members.",
-                    "Detect All");
-                return;
+                return ServiceOperationResult.Info(
+                    "Detect All",
+                    $"Property {propID} has no assigned analytical members.");
             }
 
             int[] targetBeams = Array.Empty<int>();
@@ -49,30 +60,30 @@ namespace StaadSteelApp.Core
 
             if (targetBeams.Length == 0)
             {
-                StaadSteelApp.TopMostMessageBox.ShowWarning(
-                    $"Could not get assigned beam list for property {propID}.",
-                    "Detect All");
-                return;
+                return ServiceOperationResult.Warning(
+                    "Detect All",
+                    $"Could not get assigned beam list for property {propID}.");
             }
 
-            object geometryObj = os.Geometry;
             bool selected = OpenStaadGeometryAdapter.TryHighlightBeams(geometryObj, targetBeams, out string highlightError);
             if (!selected && !string.IsNullOrWhiteSpace(highlightError))
                 Debug.WriteLine("Highlight assigned beams failed: " + highlightError);
 
             if (!selected)
             {
-                StaadSteelApp.TopMostMessageBox.ShowWarning(
-                    $"Property found (ID: {propID}) but could not highlight assigned members.",
-                    "Detect All");
+                return ServiceOperationResult.Warning(
+                    "Detect All",
+                    $"Property found (ID: {propID}) but could not highlight assigned members.");
             }
+
+            return ServiceOperationResult.Success();
         }
 
-        private static bool TryResolveSourceBeamProperty(dynamic os, int[] beamIds, out int sourceID, out int propID)
+        private static bool TryResolveSourceBeamProperty(object openStaad, object propObj, int[] beamIds, out int sourceID, out int propID)
         {
             sourceID = 0;
             propID = 0;
-            if (os == null || beamIds == null || beamIds.Length == 0) return false;
+            if (openStaad == null || propObj == null || beamIds == null || beamIds.Length == 0) return false;
 
             string sourceName = "";
 
@@ -82,7 +93,7 @@ namespace StaadSteelApp.Core
 
                 if (sourceID == 0) sourceID = beam;
 
-                if (TryReadBeamPropertyRefNo(os.Property, beam, out int beamProp) && beamProp > 0)
+                if (TryReadBeamPropertyRefNo(propObj, beam, out int beamProp) && beamProp > 0)
                 {
                     sourceID = beam;
                     propID = beamProp;
@@ -91,7 +102,6 @@ namespace StaadSteelApp.Core
 
                 if (string.IsNullOrWhiteSpace(sourceName))
                 {
-                    object openStaad = os;
                     if (!OpenStaadPropertyAdapter.TryGetBeamSectionName(openStaad, beam, out sourceName, out string sectionError))
                         Debug.WriteLine($"GetBeamSectionName failed for beam {beam}: {sectionError}");
                 }
@@ -101,7 +111,7 @@ namespace StaadSteelApp.Core
             {
                 try
                 {
-                    propID = CheckPropertyExists(os, sourceName);
+                    propID = CheckPropertyExists(openStaad, sourceName);
                 }
                 catch (Exception ex)
                 {

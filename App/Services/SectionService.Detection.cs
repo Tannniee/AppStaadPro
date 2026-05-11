@@ -7,22 +7,26 @@ namespace StaadSteelApp.Core
 {
     public static partial class SectionService
     {
-        public static SectionInfo DetectSelectedSection(dynamic os)
+        public static SectionInfo DetectSelectedSection(object os)
         {
-             if (os == null) throw new Exception("Not connected to STAAD Application.");
+             if (os == null) throw new StaadConnectionException("Not connected to STAAD Application.");
 
+             object openStaad = os;
              int[] arrBeams;
              try
              {
-                 arrBeams = GetSelectedBeamIDs(os.Geometry);
+                 if (!TryGetSectionGeometry(openStaad, out object geometryObj, out string geometryError))
+                     throw new SectionDetectionException("Error verifying selection: " + geometryError);
+
+                 arrBeams = GetSelectedBeamIDs(geometryObj);
              }
              catch (Exception ex)
              {
-                 throw new Exception("Error verifying selection: " + ex.Message);
+                 throw new SectionDetectionException("Error verifying selection: " + ex.Message, ex);
              }
 
              if (arrBeams.Length == 0)
-                 throw new Exception("No member selected. Please select an analytical beam or physical member in STAAD.");
+                 throw new SectionDetectionException("No member selected. Please select an analytical beam or physical member in STAAD.");
 
              // Fast path: work with the first selected analytical beam first.
              int beamID = 0;
@@ -38,7 +42,6 @@ namespace StaadSteelApp.Core
              int propID = 0;
              string matName = "";
              string propName = "";
-             object openStaad = os;
 
              if (beamID > 0)
              {
@@ -115,7 +118,7 @@ namespace StaadSteelApp.Core
                  }
              }
 
-             if (beamID == 0) throw new Exception("Internal Error: No valid beam ID in current selection.");
+             if (beamID == 0) throw new SectionDetectionException("Internal Error: No valid beam ID in current selection.");
 
              if (propID <= 0)
              {
@@ -138,12 +141,15 @@ namespace StaadSteelApp.Core
              return BuildSectionInfoFromProperty(os, propID, propName, matName);
         }
 
-        public static SectionInfo DetectSectionByPropertyId(dynamic os, int propertyId)
+        public static SectionInfo DetectSectionByPropertyId(object os, int propertyId)
         {
-            if (os == null) throw new Exception("Not connected to STAAD Application.");
-            if (propertyId <= 0) throw new Exception("Invalid property id.");
+            if (os == null) throw new StaadConnectionException("Not connected to STAAD Application.");
+            if (propertyId <= 0) throw new SectionPropertyException("Invalid property id.");
 
-            object propObj = os.Property;
+            object openStaad = os;
+            if (!TryGetSectionProperty(openStaad, out object propObj, out string propertyError))
+                throw new SectionPropertyException(propertyError);
+
             string propName = "";
             TryGetSectionPropertyNameById(propObj, propertyId, out propName);
 

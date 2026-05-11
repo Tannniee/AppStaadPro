@@ -6,18 +6,20 @@ namespace StaadSteelApp.Core.Misc
 {
     internal static class MemberSpecService
     {
-        internal static void ApplyMemberSpecSelected(MiscMemberSpecType specType)
+        internal static ServiceOperationResult ApplyMemberSpecSelected(MiscMemberSpecType specType)
         {
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null) return;
+            if (!MiscOpenStaadService.TryGetProperty(out object propObj, out string propertyError))
+            {
+                Debug.WriteLine(propertyError);
+                return ServiceOperationResult.Error("Member Spec", propertyError);
+            }
 
             if (!MiscSelectionService.TryGetSelectedBeamIds(out int[] beamIds, out string selectionError))
             {
                 string message = string.IsNullOrWhiteSpace(selectionError)
                     ? "Could not read STAAD selection."
                     : selectionError;
-                TopMostMessageBox.ShowInfo(message, "Info");
-                return;
+                return ServiceOperationResult.Info("Member Spec", message);
             }
 
             int beamCount = beamIds.Length;
@@ -26,11 +28,8 @@ namespace StaadSteelApp.Core.Misc
                 string message = string.IsNullOrWhiteSpace(selectionError)
                     ? "Please select beams in STAAD."
                     : "Could not read STAAD selection: " + selectionError;
-                TopMostMessageBox.ShowInfo(message, "Info");
-                return;
+                return ServiceOperationResult.Info("Member Spec", message);
             }
-
-            object propObj = os.Property;
 
             try
             {
@@ -47,10 +46,9 @@ namespace StaadSteelApp.Core.Misc
                             cleared++;
                     }
 
-                    TopMostMessageBox.ShowSuccess(
-                        $"Normal member spec applied to {cleared}/{beamCount} beams.",
-                        "Member Spec");
-                    return;
+                    return ServiceOperationResult.Success(
+                        "Member Spec",
+                        $"Normal member spec applied to {cleared}/{beamCount} beams.");
                 }
 
                 string createMethod = GetCreateMethodName(specType);
@@ -60,8 +58,7 @@ namespace StaadSteelApp.Core.Misc
                     string message = string.IsNullOrEmpty(createError)
                         ? $"Could not create member spec via {createMethod}."
                         : createError;
-                    TopMostMessageBox.ShowError(message, "Member Spec");
-                    return;
+                    return ServiceOperationResult.Error("Member Spec", message);
                 }
 
                 foreach (int beam in beamIds)
@@ -76,18 +73,18 @@ namespace StaadSteelApp.Core.Misc
 
                 if (!TryAssignMemberSpec(propObj, beamIds, specId, specType, out string assignError))
                 {
-                    TopMostMessageBox.ShowError("Assign member spec failed: " + assignError, "Member Spec");
-                    return;
+                    return ServiceOperationResult.Error("Member Spec", "Assign member spec failed: " + assignError);
                 }
 
-                TopMostMessageBox.ShowSuccess(
-                    $"{GetSpecTypeLabel(specType)} member spec applied to {beamCount} beams.",
-                    "Member Spec");
+                return ServiceOperationResult.Success(
+                    "Member Spec",
+                    $"{GetSpecTypeLabel(specType)} member spec applied to {beamCount} beams.");
             }
             catch (Exception ex)
             {
                 Debug.WriteLine("ApplyMemberSpecSelected failed: " + ex);
-                TopMostMessageBox.ShowError("Member spec failed: " + ex.Message, "Member Spec");
+                AppLogger.Exception("Member spec failed.", ex);
+                return ServiceOperationResult.Error("Member Spec", "Member spec failed: " + ex.Message);
             }
         }
 

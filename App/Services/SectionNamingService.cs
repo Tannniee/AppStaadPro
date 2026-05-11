@@ -1,14 +1,10 @@
 using System;
 using System.Linq;
-// Legacy typed COM reference removed; OpenSTAAD is accessed dynamically.
 
 namespace StaadSteelApp.Core
 {
     public static class SectionNamingService
     {
-        // ==========================================================
-        // HELPER: Auto Increment String (e.g. A1-1 -> A1-2)
-        // ==========================================================
         public static string AutoIncrementString(string s)
         {
             if (string.IsNullOrEmpty(s)) return "1";
@@ -16,7 +12,7 @@ namespace StaadSteelApp.Core
             string numStr = "";
             int i;
 
-            // Scan from right to left for digits
+            // Read a trailing numeric suffix and increment it.
             for (i = s.Length - 1; i >= 0; i--)
             {
                 if (char.IsDigit(s[i]))
@@ -33,7 +29,6 @@ namespace StaadSteelApp.Core
             {
                 string prefix = s.Substring(0, s.Length - numStr.Length);
                 
-                // Parse and increment
                 if (long.TryParse(numStr, out long n))
                 {
                     n++;
@@ -41,13 +36,9 @@ namespace StaadSteelApp.Core
                 }
             }
             
-            // No number found at end or parse failed, append -1
             return s + "-1";
         }
 
-        // ==========================================================
-        // HELPER: Number Formatting
-        // ==========================================================
         public static string FmtNum(double d)
         {
             if (Math.Abs(d - Math.Truncate(d)) < 0.000001)
@@ -66,9 +57,6 @@ namespace StaadSteelApp.Core
             return "0";
         }
 
-        // ==========================================================
-        // AUTO-GENERATE NEW NAME
-        // ==========================================================
         public static string GenerateSectionName(eFramePropType type, double h1, double h2, double tw, double bf, double tf, double bfb, double tfb, double dis = 0)
         {
             if (type == eFramePropType.Pipe)
@@ -123,17 +111,17 @@ namespace StaadSteelApp.Core
                  {
                      if (bfb > 0 && tfb > 0 && (Math.Abs(bf - bfb) > 0.1 || Math.Abs(tf - tfb) > 0.1))
                      {
-                         return "I-" + FmtNum(h1) + "x" + FmtNum(tw) + "x" + FmtNum(bf) + "x" + FmtNum(tf) + "x" + FmtNum(bfb) + "x" + FmtNum(tfb);
+                         return "I-" + FmtNum(h1) + "x" + FmtNum(bf) + "x" + FmtNum(tw) + "x" + FmtNum(tf) + "x" + FmtNum(bfb) + "x" + FmtNum(tfb);
                      }
-                     return "I-" + FmtNum(h1) + "x" + FmtNum(tw) + "x" + FmtNum(bf) + "x" + FmtNum(tf);
+                     return "I-" + FmtNum(h1) + "x" + FmtNum(bf) + "x" + FmtNum(tw) + "x" + FmtNum(tf);
                  }
                  else
                  {
                      if (bfb > 0 && tfb > 0 && (Math.Abs(bf - bfb) > 0.1 || Math.Abs(tf - tfb) > 0.1))
                      {
-                         return "I-(" + FmtNum(h1) + "~" + FmtNum(h2) + ")x" + FmtNum(tw) + "x" + FmtNum(bf) + "x" + FmtNum(tf) + "x" + FmtNum(bfb) + "x" + FmtNum(tfb);
+                         return "I-(" + FmtNum(h1) + "~" + FmtNum(h2) + ")x" + FmtNum(bf) + "x" + FmtNum(tw) + "x" + FmtNum(tf) + "x" + FmtNum(bfb) + "x" + FmtNum(tfb);
                      }
-                     return "I-(" + FmtNum(h1) + "~" + FmtNum(h2) + ")x" + FmtNum(tw) + "x" + FmtNum(bf) + "x" + FmtNum(tf);
+                     return "I-(" + FmtNum(h1) + "~" + FmtNum(h2) + ")x" + FmtNum(bf) + "x" + FmtNum(tw) + "x" + FmtNum(tf);
                  }
              }
  

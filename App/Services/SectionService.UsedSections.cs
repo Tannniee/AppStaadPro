@@ -14,7 +14,7 @@ namespace StaadSteelApp.Core
         private static Dictionary<int, UsedSectionEntry> _usedSectionsPropertyCache = new Dictionary<int, UsedSectionEntry>();
         private static bool _usedSectionsCacheInitialized;
 
-        public static List<UsedSectionEntry> GetUsedSections(dynamic os)
+        public static List<UsedSectionEntry> GetUsedSections(object os)
         {
             if (os == null)
                 return new List<UsedSectionEntry>();
@@ -26,7 +26,7 @@ namespace StaadSteelApp.Core
             }
         }
 
-        public static void UpdateUsedSectionsCacheAfterAssignment(dynamic os, IEnumerable<int> beamIds, int targetPropertyId)
+        public static void UpdateUsedSectionsCacheAfterAssignment(object os, IEnumerable<int> beamIds, int targetPropertyId)
         {
             if (os == null || targetPropertyId <= 0)
                 return;
@@ -71,7 +71,14 @@ namespace StaadSteelApp.Core
 
                 if (!_usedSectionsPropertyCache.TryGetValue(targetPropertyId, out UsedSectionEntry targetEntry))
                 {
-                    targetEntry = BuildUsedSectionsCacheEntry(os.Property, targetPropertyId, assignedBeamIds);
+                    object openStaad = os;
+                    if (!TryGetSectionProperty(openStaad, out object targetPropObj, out string targetPropertyError))
+                    {
+                        Debug.WriteLine("Property object is not available: " + targetPropertyError);
+                        return;
+                    }
+
+                    targetEntry = BuildUsedSectionsCacheEntry(targetPropObj, targetPropertyId, assignedBeamIds);
                     if (targetEntry == null)
                         return;
 
@@ -90,7 +97,7 @@ namespace StaadSteelApp.Core
             }
         }
 
-        private static void EnsureUsedSectionsCache(dynamic os)
+        private static void EnsureUsedSectionsCache(object os)
         {
             string modelKey = GetUsedSectionsModelKey(os);
             if (_usedSectionsCacheInitialized &&
@@ -102,7 +109,7 @@ namespace StaadSteelApp.Core
             RebuildUsedSectionsCache(os, modelKey);
         }
 
-        private static void RebuildUsedSectionsCache(dynamic os, string modelKey)
+        private static void RebuildUsedSectionsCache(object os, string modelKey)
         {
             var cache = new Dictionary<int, UsedSectionEntry>();
             if (os == null)
@@ -113,7 +120,16 @@ namespace StaadSteelApp.Core
                 return;
             }
 
-            object propObj = os.Property;
+            object openStaad = os;
+            if (!TryGetSectionProperty(openStaad, out object propObj, out string propertyError))
+            {
+                Debug.WriteLine("Property object is not available: " + propertyError);
+                _usedSectionsPropertyCache = cache;
+                _usedSectionsCacheModelKey = modelKey ?? "";
+                _usedSectionsCacheInitialized = true;
+                return;
+            }
+
             int count = 0;
 
             if (!OpenStaadPropertyAdapter.TryGetSectionPropertyCount(propObj, out count, out string countError))
@@ -237,44 +253,7 @@ namespace StaadSteelApp.Core
             };
         }
 
-        private static bool TryGetCachedBeamIds(dynamic os, IEnumerable<int> propertyIds, out int[] beamIds)
-        {
-            beamIds = Array.Empty<int>();
-            if (os == null)
-                return false;
-
-            int[] validPropertyIds = (propertyIds ?? Enumerable.Empty<int>())
-                .Where(x => x > 0)
-                .Distinct()
-                .OrderBy(x => x)
-                .ToArray();
-
-            if (validPropertyIds.Length == 0)
-                return false;
-
-            lock (_usedSectionsCacheSync)
-            {
-                EnsureUsedSectionsCache(os);
-
-                var beamSet = new HashSet<int>();
-                foreach (int propertyId in validPropertyIds)
-                {
-                    if (!_usedSectionsPropertyCache.TryGetValue(propertyId, out UsedSectionEntry entry))
-                        return false;
-
-                    foreach (int beamId in entry.BeamIds ?? Array.Empty<int>())
-                    {
-                        if (beamId > 0)
-                            beamSet.Add(beamId);
-                    }
-                }
-
-                beamIds = beamSet.OrderBy(x => x).ToArray();
-                return beamIds.Length > 0;
-            }
-        }
-
-        private static string GetUsedSectionsModelKey(dynamic os)
+        private static string GetUsedSectionsModelKey(object os)
         {
             string staadFilePath = "";
             if (os != null && TryGetStaadFilePath(os, out staadFilePath) && !string.IsNullOrWhiteSpace(staadFilePath))
@@ -283,7 +262,7 @@ namespace StaadSteelApp.Core
             return "session:" + RuntimeHelpers.GetHashCode((object)os);
         }
 
-        private static bool TryGetStaadFilePath(dynamic os, out string staadFilePath)
+        private static bool TryGetStaadFilePath(object os, out string staadFilePath)
         {
             staadFilePath = "";
             if (os == null)
@@ -303,86 +282,6 @@ namespace StaadSteelApp.Core
             }
 
             return false;
-        }
-
-        public static bool HighlightUsedSection(dynamic os, int propertyId, out string error)
-        {
-            return HighlightUsedSections(os, new[] { propertyId }, out error);
-        }
-
-        public static bool HighlightBeamIds(dynamic os, IEnumerable<int> beamIds, out string error)
-        {
-            error = "";
-            if (os == null)
-            {
-                error = "Not connected to STAAD.";
-                return false;
-            }
-
-            int[] validBeamIds = (beamIds ?? Enumerable.Empty<int>())
-                .Where(x => x > 0)
-                .Distinct()
-                .OrderBy(x => x)
-                .ToArray();
-
-            if (validBeamIds.Length == 0)
-            {
-                error = "Could not read assigned beam list for selected section.";
-                return false;
-            }
-
-            object geometryObj = os.Geometry;
-            if (OpenStaadGeometryAdapter.TryHighlightBeams(geometryObj, validBeamIds, out string highlightError))
-                return true;
-
-            if (!string.IsNullOrWhiteSpace(highlightError))
-                Debug.WriteLine("Highlight used section beams failed: " + highlightError);
-
-            error = "Selected section was found, but STAAD selection could not be updated.";
-            return false;
-        }
-
-        public static bool HighlightUsedSections(dynamic os, IEnumerable<int> propertyIds, out string error)
-        {
-            error = "";
-            if (os == null)
-            {
-                error = "Not connected to STAAD.";
-                return false;
-            }
-
-            int[] validPropertyIds = (propertyIds ?? Enumerable.Empty<int>())
-                .Where(x => x > 0)
-                .Distinct()
-                .ToArray();
-
-            if (validPropertyIds.Length == 0)
-            {
-                error = "Invalid property id.";
-                return false;
-            }
-
-            if (TryGetCachedBeamIds(os, validPropertyIds, out int[] cachedBeamIds))
-                return HighlightBeamIds(os, cachedBeamIds, out error);
-
-            object propObj = os.Property;
-            var beamSet = new HashSet<int>();
-            foreach (int propertyId in validPropertyIds)
-            {
-                int count = TryGetAssignedBeamCount(propObj, propertyId);
-                if (count <= 0)
-                    continue;
-
-                int[] ids = TryGetAssignedBeamList(propObj, propertyId, count);
-                foreach (int beamId in ids)
-                {
-                    if (beamId > 0)
-                        beamSet.Add(beamId);
-                }
-            }
-
-            int[] beamIds = beamSet.OrderBy(x => x).ToArray();
-            return HighlightBeamIds(os, beamIds, out error);
         }
 
         private static int[] GetSectionPropertyIds(object propObj, int count)
@@ -437,241 +336,6 @@ namespace StaadSteelApp.Core
             return 0;
         }
 
-        private static string BuildUsedSectionDisplayName(object propObj, int propertyId, int typeCode, string rawName)
-        {
-            if (propObj == null || propertyId <= 0)
-                return rawName ?? "";
 
-            ReadSectionShapeData(propObj, propertyId, out int actualTypeCode, out double[] props, out double width, out double depth, out double tf, out double tw);
-            if (actualTypeCode > 0)
-                typeCode = actualTypeCode;
-
-            double h1mm;
-            double h2mm;
-            double twmm;
-            double bfmm;
-            double tfmm;
-            double bfbmm;
-            double tfbmm;
-
-            switch (typeCode)
-            {
-                case 680:
-                    h1mm = GetAt(props, 0) * 1000.0;
-                    h2mm = GetAt(props, 2) * 1000.0;
-                    twmm = GetAt(props, 1) * 1000.0;
-                    bfmm = GetAt(props, 3) * 1000.0;
-                    tfmm = GetAt(props, 4) * 1000.0;
-                    bfbmm = GetAt(props, 5, GetAt(props, 3)) * 1000.0;
-                    tfbmm = GetAt(props, 6, GetAt(props, 4)) * 1000.0;
-                    return FirstNonEmpty(
-                        SectionNamingService.GenerateSectionName(eFramePropType.I, h1mm, h2mm, twmm, bfmm, tfmm, bfbmm, tfbmm, 0),
-                        rawName);
-
-                case 610:
-                case 611:
-                case 612:
-                case 616:
-                case 670:
-                case 698:
-                    h1mm = GetAt(props, 1, depth) * 1000.0;
-                    bfmm = GetAt(props, 2, width) * 1000.0;
-                    twmm = GetAt(props, 4, tw) * 1000.0;
-                    tfmm = GetAt(props, 3, tf) * 1000.0;
-                    return FirstNonEmpty(
-                        SectionNamingService.GenerateSectionName(eFramePropType.I, h1mm, h1mm, twmm, bfmm, tfmm, bfmm, tfmm, 0),
-                        rawName);
-
-                case 620:
-                case 673:
-                case 694:
-                case 61100:
-                    h1mm = GetAt(props, 1, depth) * 1000.0;
-                    bfmm = GetAt(props, 2, width) * 1000.0;
-                    twmm = GetAt(props, 4, tw) * 1000.0;
-                    tfmm = GetAt(props, 3, tf) * 1000.0;
-                    return FirstNonEmpty(
-                        "T-" + SectionNamingService.FmtNum(h1mm) + "x" + SectionNamingService.FmtNum(bfmm) + "x" + SectionNamingService.FmtNum(twmm) + "x" + SectionNamingService.FmtNum(tfmm),
-                        rawName);
-
-                case 630:
-                case 631:
-                case 691:
-                    h1mm = GetAt(props, 1, depth) * 1000.0;
-                    bfmm = GetAt(props, 2, width) * 1000.0;
-                    twmm = GetAt(props, 4, tw) * 1000.0;
-                    tfmm = GetAt(props, 3, tf) * 1000.0;
-                    return FirstNonEmpty(
-                        SectionNamingService.GenerateSectionName(eFramePropType.Channel, h1mm, 0, twmm, bfmm, tfmm, 0, 0, 0),
-                        rawName);
-
-                case 640:
-                case 692:
-                    h1mm = GetAt(props, 1, depth) * 1000.0;
-                    bfmm = GetAt(props, 2, width) * 1000.0;
-                    tfmm = GetAt(props, 3, tf > 0 ? tf : tw) * 1000.0;
-                    return FirstNonEmpty(
-                        SectionNamingService.GenerateSectionName(eFramePropType.Angle, h1mm, 0, 0, bfmm, tfmm, 0, 0, 0),
-                        rawName);
-
-                case 693:
-                    h1mm = GetAt(props, 1, depth) * 1000.0;
-                    bfmm = GetAt(props, 2, width) * 1000.0;
-                    tfmm = GetAt(props, 3, tf > 0 ? tf : tw) * 1000.0;
-                    return FirstNonEmpty(
-                        SectionNamingService.GenerateSectionName(eFramePropType.DblAngle, h1mm, 0, 0, bfmm, tfmm, 0, 0, 0),
-                        rawName);
-
-                case 650:
-                case 654:
-                case 675:
-                    h1mm = GetAt(props, 1, depth) * 1000.0;
-                    h2mm = GetAt(props, 2, width) * 1000.0;
-                    tfmm = GetAt(props, 3, tf > 0 ? tf : tw) * 1000.0;
-                    twmm = GetAt(props, 4, tw > 0 ? tw : tf) * 1000.0;
-                    return FirstNonEmpty(
-                        SectionNamingService.GenerateSectionName(eFramePropType.Rectangular, h1mm, h2mm, twmm, 0, tfmm, 0, 0, 0),
-                        rawName);
-
-                case 696:
-                    h1mm = GetAt(props, 1, depth) * 1000.0;
-                    h2mm = GetAt(props, 2, width) * 1000.0;
-                    tfmm = GetAt(props, 3, tf > 0 ? tf : tw) * 1000.0;
-                    return FirstNonEmpty(
-                        SectionNamingService.GenerateSectionName(eFramePropType.Rectangular, h1mm, h2mm, tfmm, 0, tfmm, 0, 0, 0),
-                        rawName);
-
-                case 672:
-                    h1mm = GetAt(props, 1, depth) * 1000.0;
-                    h2mm = GetAt(props, 2, width) * 1000.0;
-                    if (h1mm > 0 && h2mm > 0)
-                        return "Rect-" + SectionNamingService.FmtNum(h1mm) + "x" + SectionNamingService.FmtNum(h2mm);
-                    return rawName ?? "";
-
-                case 655:
-                case 660:
-                case 661:
-                    h1mm = GetAt(props, 1, depth > 0 ? depth : width) * 1000.0;
-                    double tmm = GetAt(props, 2, tw > 0 ? tw : tf) * 1000.0;
-                    return FirstNonEmpty(
-                        SectionNamingService.GenerateSectionName(eFramePropType.Pipe, h1mm, 0, tmm, 0, 0, 0, 0, 0),
-                        rawName);
-
-                case 695:
-                    h1mm = GetAt(props, 1, depth > 0 ? depth : width) * 1000.0;
-                    double idmm = GetAt(props, 2, tw > 0 ? tw : tf) * 1000.0;
-                    double uptPipeThickness = (h1mm - idmm) / 2.0;
-                    return FirstNonEmpty(
-                        SectionNamingService.GenerateSectionName(eFramePropType.Pipe, h1mm, 0, uptPipeThickness, 0, 0, 0, 0, 0),
-                        rawName);
-
-                case 671:
-                    h1mm = GetAt(props, 1, depth) * 1000.0;
-                    if (h1mm > 0)
-                        return "Circle-" + SectionNamingService.FmtNum(h1mm);
-                    return rawName ?? "";
-
-                default:
-                    return rawName ?? "";
-            }
-        }
-
-        private static void ReadSectionShapeData(object propObj, int propertyId, out int typeCode, out double[] props, out double width, out double depth, out double tf, out double tw)
-        {
-            typeCode = 0;
-            props = new double[25];
-            width = 0;
-            depth = 0;
-            tf = 0;
-            tw = 0;
-
-            if (propObj == null || propertyId <= 0)
-                return;
-
-            if (!OpenStaadPropertyAdapter.TryGetSectionPropertyValuesExFromProperty(propObj, propertyId, out typeCode, out props, out string exError))
-                Debug.WriteLine($"GetSectionPropertyValuesEx failed for property {propertyId}: {exError}");
-
-            if (OpenStaadPropertyAdapter.TryGetSectionPropertyValuesFromProperty(propObj, propertyId, out double[] values, out string valuesError))
-            {
-                width = GetAt(values, 0);
-                depth = GetAt(values, 1);
-                tf = GetAt(values, 8);
-                tw = GetAt(values, 9);
-            }
-            else
-            {
-                Debug.WriteLine($"GetSectionPropertyValues failed for property {propertyId}: {valuesError}");
-            }
-        }
-
-        private static string FirstNonEmpty(string primary, string fallback)
-        {
-            if (!string.IsNullOrWhiteSpace(primary))
-                return primary;
-
-            return fallback ?? "";
-        }
-
-        private static double ToDouble(object value)
-        {
-            try
-            {
-                return Convert.ToDouble(value);
-            }
-            catch
-            {
-                return 0.0;
-            }
-        }
-
-        private static double GetAt(double[] values, int index, double fallback = 0)
-        {
-            if (values != null && index >= 0 && index < values.Length)
-            {
-                double value = values[index];
-                if (Math.Abs(value) > 0.0000001)
-                    return value;
-            }
-
-            return fallback;
-        }
-
-        private static void ResolveSortMetadata(int typeCode, out int sortGroup, out int sortType, out string sourceLabel)
-        {
-            sortGroup = 3;
-            sortType = 9;
-            sourceLabel = "Other";
-
-            if (typeCode == 680)
-            {
-                sortGroup = 0;
-                sortType = 0;
-                sourceLabel = "Tapered I";
-                return;
-            }
-
-            if (typeCode >= 670 && typeCode <= 679)
-            {
-                sortGroup = 0;
-                sortType = 1;
-                sourceLabel = "Prismatic";
-                return;
-            }
-
-            if (typeCode >= 610 && typeCode <= 669)
-            {
-                sortGroup = 1;
-                sortType = 0;
-                sourceLabel = "Legacy";
-                return;
-            }
-
-            if (typeCode >= 690 && typeCode <= 699)
-            {
-                sortGroup = 2;
-                sortType = 0;
-                sourceLabel = "UPT";
-            }
-        }
     }
 }

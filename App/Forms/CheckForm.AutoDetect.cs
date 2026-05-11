@@ -158,10 +158,8 @@ namespace StaadSteelApp
                 return Array.Empty<int>();
 
             object openStaad = _os;
-            if (OpenStaadSelectionAdapter.TryGetSelectedBeamIds(
+            if (CheckForceExtractionService.TryGetSelectedBeamIds(
                     openStaad,
-                    false,
-                    false,
                     new[] { 0, 1 },
                     out int[] beamIds,
                     out error))
@@ -177,36 +175,26 @@ namespace StaadSteelApp
             if (_os == null) return "Unknown";
 
             object openStaad = _os;
-            if (OpenStaadPropertyAdapter.TryGetBeamSectionName(openStaad, memberNo, out string sectionName, out string error))
+            if (CheckMemberInfoService.TryGetBeamSectionName(openStaad, memberNo, out string sectionName, out string error))
                 return string.IsNullOrWhiteSpace(sectionName) ? "Unknown" : sectionName;
 
             WarnOnce($"GetBeamSectionName:{memberNo}", $"Member {memberNo}: could not read section name from STAAD. Using 'Unknown'. {error}");
             return "Unknown";
         }
 
-        private bool TryGetTaperedSectionData(int memberNo, out TaperedSectionData data)
+        private bool TryGetTaperedSectionData(int memberNo, out CheckTaperedSectionInfo data)
         {
             data = null;
             if (_os == null) return false;
 
             object openStaad = _os;
-            if (!OpenStaadPropertyAdapter.TryGetTaperedSectionDataForMember(openStaad, memberNo, out OpenStaadTaperedSectionData tapered, out string error))
+            if (!CheckMemberInfoService.TryGetTaperedSectionData(openStaad, memberNo, out CheckTaperedSectionInfo tapered, out string error))
             {
                 WarnOnce($"TryGetTapered:{memberNo}", $"Member {memberNo}: failed to read tapered section data from STAAD. {error}");
                 return false;
             }
 
-            data = new TaperedSectionData
-            {
-                H1 = tapered.H1,
-                H2 = tapered.H2,
-                Tw = tapered.Tw,
-                Bf = tapered.Bf,
-                Tf = tapered.Tf,
-                Bfb = tapered.Bfb,
-                Tfb = tapered.Tfb
-            };
-
+            data = tapered;
             return true;
         }
 
@@ -215,7 +203,7 @@ namespace StaadSteelApp
             if (_os == null) return "Steel";
 
             object openStaad = _os;
-            if (OpenStaadPropertyAdapter.TryGetBeamMaterialName(openStaad, memberNo, out string materialName, out string error))
+            if (CheckMemberInfoService.TryGetBeamMaterialName(openStaad, memberNo, out string materialName, out string error))
                 return string.IsNullOrWhiteSpace(materialName) ? "Steel" : materialName;
 
             WarnOnce($"GetBeamMaterialName:{memberNo}", $"Member {memberNo}: could not read material name from STAAD. Using 'Steel'. {error}");

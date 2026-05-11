@@ -33,14 +33,9 @@ namespace StaadSteelApp.Core.Advance
                 return false;
             }
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                message = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetGeometry(out _, out object geometry, out message))
                 return false;
-            }
 
-            object geometry = os.Geometry;
             int[] validTargets = AdvanceSelectionService.FilterValidNodeIds(geometry, targetNodeIds, out int invalidTargetCount);
             if (validTargets.Length == 0)
             {

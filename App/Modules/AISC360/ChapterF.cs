@@ -301,7 +301,7 @@ namespace StaadSteelApp.AISC360
 
             result.Details.Add(new CalculationStep(
                 input.Method == DesignMethod.LRFD ? "fMn" : "Mn/O",
-                input.Method == DesignMethod.LRFD ? $"{phi:F2}�Mn" : "Mn/{omega:F2}",
+                input.Method == DesignMethod.LRFD ? $"{phi:F2}*Mn" : $"Mn/{omega:F2}",
                 "", result.Capacity, "kN-m"));
 
             result.CalculateRatio();

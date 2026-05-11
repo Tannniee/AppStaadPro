@@ -15,14 +15,9 @@ namespace StaadSteelApp.Core.Advance
             newNodeId = 0;
             message = string.Empty;
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                message = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetGeometry(out _, out object geometry, out message))
                 return false;
-            }
 
-            object geometry = os.Geometry;
             if (!AdvanceSelectionService.TryGetNodePoint(geometry, lineNodeA, out AdvancePoint3D a, out string readAError))
             {
                 message = $"Could not read coordinates of line node {lineNodeA}: {readAError}";
@@ -86,14 +81,9 @@ namespace StaadSteelApp.Core.Advance
                 return false;
             }
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                message = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetGeometry(out _, out object geometry, out message))
                 return false;
-            }
 
-            object geometry = os.Geometry;
             if (!AdvanceSelectionService.TryGetNodePoint(geometry, templateNodeId, out AdvancePoint3D templatePoint, out string templateError))
             {
                 message = $"Could not read template node {templateNodeId}: {templateError}";
@@ -138,16 +128,12 @@ namespace StaadSteelApp.Core.Advance
                 return false;
             }
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                message = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetGeometry(out _, out object geometry, out message))
                 return false;
-            }
 
             AdvancePoint3D targetPoint = new AdvancePoint3D(targetX, targetY, targetZ);
             return TryAlignNodesToPoint(
-                os.Geometry,
+                geometry,
                 targetNodeIds,
                 targetPoint,
                 alignX,

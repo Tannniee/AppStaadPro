@@ -5,7 +5,7 @@ using StaadSteelApp.Core.Interop;
 
 namespace StaadSteelApp.Core
 {
-    public static class LoadService
+    public static partial class LoadService
     {
         private static bool? _lastHighlightWasNodeLoad;
         private static string _lastHighlightKey = string.Empty;
@@ -84,13 +84,10 @@ namespace StaadSteelApp.Core
 
         public static IReadOnlyList<LoadCaseItem> GetPrimaryLoadCases()
         {
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null)
+            if (!TryGetLoadObject(out object loadObj, out _))
                 return Array.Empty<LoadCaseItem>();
 
-            object openStaad = os;
-            if (!OpenStaadLoadAdapter.TryGetLoadObject(openStaad, out object loadObj, out _) ||
-                !OpenStaadLoadAdapter.TryGetPrimaryLoadCaseNumbers(loadObj, out int[] numbers, out _) ||
+            if (!OpenStaadLoadAdapter.TryGetPrimaryLoadCaseNumbers(loadObj, out int[] numbers, out _) ||
                 numbers.Length == 0)
             {
                 return Array.Empty<LoadCaseItem>();
@@ -109,52 +106,11 @@ namespace StaadSteelApp.Core
             return loadCases;
         }
 
-        public static IReadOnlyList<LoadTreeCase> GetPrimaryLoadTree()
-        {
-            var loadCases = GetPrimaryLoadCases();
-            if (loadCases.Count == 0)
-                return Array.Empty<LoadTreeCase>();
-
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-                return Array.Empty<LoadTreeCase>();
-
-            object openStaad = os;
-            if (!OpenStaadLoadAdapter.TryGetLoadObject(openStaad, out object loadObj, out _))
-                return Array.Empty<LoadTreeCase>();
-
-            var treeCases = new List<LoadTreeCase>(loadCases.Count);
-            int originalActiveLoad = TryGetActiveLoad(loadObj);
-
-            try
-            {
-                foreach (LoadCaseItem loadCase in loadCases)
-                {
-                    LoadTreeCase treeCase = BuildLoadTreeCase(loadObj, loadCase);
-                    if (treeCase.Items.Count > 0)
-                    {
-                        treeCases.Add(treeCase);
-                    }
-                }
-            }
-            finally
-            {
-                if (originalActiveLoad > 0)
-                {
-                    TrySetLoadActive(loadObj, originalActiveLoad, out _);
-                }
-            }
-
-            return treeCases;
-        }
-
         public static IReadOnlyList<string> GetGroupNames(GroupType groupType)
         {
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null)
+            if (!TryGetOpenStaad(out object openStaad, out _))
                 return Array.Empty<string>();
 
-            object openStaad = os;
             if (!OpenStaadGeometryAdapter.TryGetGroupNames(openStaad, (int)groupType, out string[] names, out _) ||
                 names.Length == 0)
             {
@@ -170,118 +126,19 @@ namespace StaadSteelApp.Core
             if (string.IsNullOrWhiteSpace(groupName))
                 return Array.Empty<int>();
 
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null)
+            if (!TryGetOpenStaad(out object openStaad, out _))
                 return Array.Empty<int>();
 
-            object openStaad = os;
             return OpenStaadGeometryAdapter.TryGetGroupEntities(openStaad, groupName, out int[] entities, out _)
                 ? entities
                 : Array.Empty<int>();
         }
 
-        private static LoadTreeCase BuildLoadTreeCase(object loadObj, LoadCaseItem loadCase)
-        {
-            if (!TrySetLoadActive(loadObj, loadCase.Number, out string activeError))
-                throw new InvalidOperationException("Could not activate load case " + loadCase.Number + ": " + activeError);
-
-            if (!OpenStaadLoadAdapter.TryGetLoadItemsCount(loadObj, loadCase.Number, out int itemCount, out string countError))
-                throw new InvalidOperationException("Could not read load item count: " + countError);
-
-            if (itemCount <= 0)
-                return new LoadTreeCase(loadCase.Number, loadCase.Title, Array.Empty<LoadTreeItem>());
-
-            var typeIndexes = new Dictionary<int, int>();
-            var items = new List<LoadTreeItem>(itemCount);
-
-            for (int itemIndex = 0; itemIndex < itemCount; itemIndex++)
-            {
-                if (!OpenStaadLoadAdapter.TryGetLoadItemType(loadObj, loadCase.Number, itemIndex, out int typeCode, out _))
-                    continue;
-
-                if (!IsSupportedTreeLoadType(typeCode))
-                    continue;
-
-                int typeIndex = typeIndexes.TryGetValue(typeCode, out int currentTypeIndex) ? currentTypeIndex : 0;
-                typeIndexes[typeCode] = typeIndex + 1;
-
-                try
-                {
-                    items.Add(BuildLoadTreeItem(loadObj, itemIndex, typeCode, typeIndex));
-                }
-                catch
-                {
-                }
-            }
-
-            return new LoadTreeCase(loadCase.Number, loadCase.Title, items);
-        }
-
-        private static LoadTreeItem BuildLoadTreeItem(object loadObj, int itemIndex, int typeCode, int typeIndex)
-        {
-            int[] assignments = GetAssignmentListForLoadType(loadObj, typeCode, typeIndex);
-
-            switch (typeCode)
-            {
-                case 3110:
-                case 3120:
-                case 3210:
-                case 3275:
-                    return typeCode == 3110 || typeCode == 3120
-                        ? BuildNodalTreeItem(loadObj, itemIndex, typeCode, assignments)
-                        : BuildMemberTreeItem(loadObj, itemIndex, typeCode, assignments);
-                default:
-                    throw new InvalidOperationException("Unsupported load item type " + typeCode + ".");
-            }
-        }
-
-        private static LoadTreeItem BuildNodalTreeItem(object loadObj, int itemIndex, int typeCode, IReadOnlyList<int> assignments)
-        {
-            if (!OpenStaadLoadAdapter.TryGetNodalLoadInfo(loadObj, itemIndex, out double[] forces, out string error))
-                throw new InvalidOperationException("GetNodalLoadInfo failed for item " + itemIndex + ": " + error);
-
-            string summary = BuildNodalSummary(forces, typeCode);
-            string details = BuildDetails(
-                itemIndex,
-                typeCode,
-                GetLoadTypeName(typeCode),
-                assignments,
-                "Forces",
-                $"FX={FormatNumber(forces[0])}, FY={FormatNumber(forces[1])}, FZ={FormatNumber(forces[2])}, MX={FormatNumber(forces[3])}, MY={FormatNumber(forces[4])}, MZ={FormatNumber(forces[5])}");
-
-            return new LoadTreeItem(itemIndex, typeCode, GetLoadTypeName(typeCode), summary, details, assignments);
-        }
-
-        private static LoadTreeItem BuildMemberTreeItem(object loadObj, int itemIndex, int typeCode, IReadOnlyList<int> assignments)
-        {
-            if (!OpenStaadLoadAdapter.TryGetMemberLoadInfo(loadObj, itemIndex, out int direction, out double[] force, out double[] dist, out string error))
-                throw new InvalidOperationException("GetMemberLoadInfo failed for item " + itemIndex + ": " + error);
-
-            string summary = BuildMemberSummary(typeCode, direction, force, dist);
-            string details = BuildDetails(
-                itemIndex,
-                typeCode,
-                GetLoadTypeName(typeCode),
-                assignments,
-                "Parameters",
-                $"Dir={GetDirectionText(direction)}, W1={FormatNumber(force[0])}, W2={FormatNumber(force[1])}, W3={FormatNumber(force[2])}, D1={FormatNumber(dist[0])}, D2={FormatNumber(dist[1])}, D3={FormatNumber(dist[2])}");
-
-            return new LoadTreeItem(itemIndex, typeCode, GetLoadTypeName(typeCode), summary, details, assignments);
-        }
-
-        private static LoadTreeItem CreateSimpleTreeItem(int itemIndex, int typeCode, string typeName, string summary, IReadOnlyList<int> assignments)
-        {
-            string details = BuildDetails(itemIndex, typeCode, typeName, assignments, null, null);
-            return new LoadTreeItem(itemIndex, typeCode, typeName, summary, details, assignments);
-        }
-
         public static void AssignUniformMemberLoad(int loadCaseNo, MemberLoadDirection direction, double force)
         {
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-                return;
+            if (!TryGetOpenStaad(out object openStaad, out string connectionError))
+                throw new InvalidOperationException(connectionError);
 
-            object openStaad = os;
             if (!OpenStaadSelectionAdapter.TryGetSelectedBeamIds(
                     openStaad,
                     false,
@@ -305,7 +162,7 @@ namespace StaadSteelApp.Core
 
         public static void AssignUniformMemberLoadToGroup(int loadCaseNo, string groupName, MemberLoadDirection direction, double force)
         {
-            int[] members = GetGroupEntities(groupName);
+            int[] members = GetGroupEntitiesOrThrow(groupName);
             if (members.Length == 0)
                 throw new InvalidOperationException("The selected member group does not contain any members.");
 
@@ -314,11 +171,9 @@ namespace StaadSteelApp.Core
 
         public static void AssignNodalLoad(int loadCaseNo, double fx, double fy, double fz, double mx, double my, double mz)
         {
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-                return;
+            if (!TryGetOpenStaad(out object openStaad, out string connectionError))
+                throw new InvalidOperationException(connectionError);
 
-            object openStaad = os;
             int ignoredInvalidCount;
             if (!OpenStaadSelectionAdapter.TryGetSelectedNodeIds(
                     openStaad,
@@ -344,7 +199,7 @@ namespace StaadSteelApp.Core
 
         public static void AssignNodalLoadToGroup(int loadCaseNo, string groupName, double fx, double fy, double fz, double mx, double my, double mz)
         {
-            int[] nodes = GetGroupEntities(groupName);
+            int[] nodes = GetGroupEntitiesOrThrow(groupName);
             if (nodes.Length == 0)
                 throw new InvalidOperationException("The selected node group does not contain any nodes.");
 
@@ -356,17 +211,12 @@ namespace StaadSteelApp.Core
             if (item == null)
                 return;
 
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-                throw new InvalidOperationException("STAAD is not available.");
+            if (!TryGetGeometry(out object geometry, out string geometryError))
+                throw new InvalidOperationException(geometryError);
 
             int[] ids = CopyIds(item.Assignments);
             if (ids.Length == 0)
                 throw new InvalidOperationException("This load item does not contain any assigned entities.");
-
-            object openStaad = os;
-            if (!OpenStaadAdapterHelpers.TryGetSubObject(openStaad, "Geometry", out object geometry, out string geometryError))
-                throw new InvalidOperationException(geometryError);
 
             bool isNodeLoad = item.TypeCode == 3110 || item.TypeCode == 3120;
             string highlightKey = BuildHighlightKey(isNodeLoad, ids);
@@ -400,12 +250,7 @@ namespace StaadSteelApp.Core
 
         private static void AssignUniformMemberLoad(int loadCaseNo, int[] beams, MemberLoadDirection direction, double force, string failureMessage)
         {
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-                return;
-
-            object openStaad = os;
-            if (!OpenStaadLoadAdapter.TryGetLoadObject(openStaad, out object loadObj, out string loadError))
+            if (!TryGetLoadObject(out object loadObj, out string loadError))
                 throw new InvalidOperationException(loadError);
 
             if (!TrySetLoadActive(loadObj, loadCaseNo, out string activeError))
@@ -417,12 +262,7 @@ namespace StaadSteelApp.Core
 
         private static void AssignNodalLoad(int loadCaseNo, int[] nodes, double fx, double fy, double fz, double mx, double my, double mz, string failureMessage)
         {
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-                return;
-
-            object openStaad = os;
-            if (!OpenStaadLoadAdapter.TryGetLoadObject(openStaad, out object loadObj, out string loadError))
+            if (!TryGetLoadObject(out object loadObj, out string loadError))
                 throw new InvalidOperationException(loadError);
 
             if (!TrySetLoadActive(loadObj, loadCaseNo, out string activeError))
@@ -432,146 +272,60 @@ namespace StaadSteelApp.Core
                 throw new InvalidOperationException(failureMessage);
         }
 
+        private static bool TryGetOpenStaad(out object openStaad, out string error)
+        {
+            if (StaadManager.TryGetOpenSTAAD(out openStaad, out error))
+                return true;
+
+            if (string.IsNullOrWhiteSpace(error))
+                error = "STAAD is not available.";
+
+            return false;
+        }
+
+        private static bool TryGetLoadObject(out object loadObj, out string error)
+        {
+            loadObj = null;
+
+            if (!TryGetOpenStaad(out object openStaad, out error))
+                return false;
+
+            return OpenStaadLoadAdapter.TryGetLoadObject(openStaad, out loadObj, out error);
+        }
+
+        private static bool TryGetGeometry(out object geometry, out string error)
+        {
+            geometry = null;
+
+            if (!TryGetOpenStaad(out object openStaad, out error))
+                return false;
+
+            return OpenStaadAdapterHelpers.TryGetSubObject(openStaad, "Geometry", out geometry, out error);
+        }
+
+        private static int[] GetGroupEntitiesOrThrow(string groupName)
+        {
+            if (string.IsNullOrWhiteSpace(groupName))
+                throw new InvalidOperationException("Please select a group.");
+
+            if (!TryGetOpenStaad(out object openStaad, out string connectionError))
+                throw new InvalidOperationException(connectionError);
+
+            if (!OpenStaadGeometryAdapter.TryGetGroupEntities(openStaad, groupName, out int[] entities, out string error))
+            {
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(error)
+                    ? "Could not read selected group entities."
+                    : "Could not read selected group entities: " + error);
+            }
+
+            return entities ?? Array.Empty<int>();
+        }
+
         private static int[] GetAssignmentListForLoadType(object loadObj, int loadType, int loadIndex)
         {
             return OpenStaadLoadAdapter.TryGetAssignmentListForLoadType(loadObj, loadType, loadIndex, out int[] assignments, out _)
                 ? assignments
                 : Array.Empty<int>();
-        }
-
-        private static string BuildMemberSummary(int typeCode, int direction, IReadOnlyList<double> force, IReadOnlyList<double> dist)
-        {
-            string dir = GetDirectionText(direction);
-
-            switch (typeCode)
-            {
-                case 3210:
-                case 3275:
-                    return "UNI " + dir + " " + FormatNumber(force[0]) + " kN/m";
-                default:
-                    return GetLoadTypeName(typeCode) + " " + dir;
-            }
-        }
-
-        private static string BuildNodalSummary(IReadOnlyList<double> force, int typeCode)
-        {
-            var parts = new List<string>(6);
-
-            AppendForce(parts, "FX", force[0], "kN");
-            AppendForce(parts, "FY", force[1], "kN");
-            AppendForce(parts, "FZ", force[2], "kN");
-            AppendForce(parts, "MX", force[3], "kNm");
-            AppendForce(parts, "MY", force[4], "kNm");
-            AppendForce(parts, "MZ", force[5], "kNm");
-
-            if (parts.Count == 0)
-                return GetLoadTypeName(typeCode);
-
-            return string.Join(" ", parts);
-        }
-
-        private static void AppendForce(ICollection<string> parts, string name, double value, string unit)
-        {
-            if (Math.Abs(value) < 1e-9)
-                return;
-
-            parts.Add(name + " " + FormatNumber(value) + " " + unit);
-        }
-
-        private static string BuildDetails(int itemIndex, int typeCode, string typeName, IReadOnlyList<int> assignments, string parameterLabel, string parameterValue)
-        {
-            string assignmentText = assignments.Count == 0
-                ? "(none)"
-                : string.Join(", ", assignments);
-
-            if (string.IsNullOrWhiteSpace(parameterLabel) || string.IsNullOrWhiteSpace(parameterValue))
-            {
-                return $"Item Index: {itemIndex}\r\nType: {typeName} ({typeCode})\r\nAssignments: {assignmentText}";
-            }
-
-            return $"Item Index: {itemIndex}\r\nType: {typeName} ({typeCode})\r\n{parameterLabel}: {parameterValue}\r\nAssignments: {assignmentText}";
-        }
-
-        private static bool IsSupportedTreeLoadType(int typeCode)
-        {
-            return typeCode == 3110 ||
-                   typeCode == 3120 ||
-                   typeCode == 3210 ||
-                   typeCode == 3275;
-        }
-
-        private static int TryGetActiveLoad(object loadObj)
-        {
-            return OpenStaadLoadAdapter.TryGetActiveLoad(loadObj, out int activeLoad, out _)
-                ? activeLoad
-                : 0;
-        }
-
-        private static string GetLoadTypeName(int typeCode)
-        {
-            switch (typeCode)
-            {
-                case 4000: return "SelfWeight";
-                case 3110: return "Nodal Load";
-                case 3120: return "Nodal Load (Inclined)";
-                case 3312: return "Region Node Load";
-                case 3910: return "Support Displacement";
-                case 3210: return "Uniform Force";
-                case 3220: return "Uniform Moment";
-                case 3230: return "Concentrated Force";
-                case 3240: return "Concentrated Moment";
-                case 3250: return "Linear Varying";
-                case 3260: return "Trapezoidal";
-                case 3261: return "Hydrostatic";
-                case 3275: return "Uniform Force (Physical)";
-                case 3280: return "Uniform Moment (Physical)";
-                case 3285: return "Concentrated Force (Physical)";
-                case 3290: return "Concentrated Moment (Physical)";
-                case 3295: return "Trapezoidal (Physical)";
-                case 3810: return "Fixed End";
-                default: return "Load Type " + typeCode;
-            }
-        }
-
-        private static string GetDirectionText(int direction)
-        {
-            switch (direction)
-            {
-                case 1: return "X";
-                case 2: return "Y";
-                case 3: return "Z";
-                case 4: return "GX";
-                case 5: return "GY";
-                case 6: return "GZ";
-                case 7: return "PX";
-                case 8: return "PY";
-                case 9: return "PZ";
-                default: return direction.ToString(CultureInfo.InvariantCulture);
-            }
-        }
-
-        private static string FormatNumber(double value)
-        {
-            return value.ToString("0.#####", CultureInfo.InvariantCulture);
-        }
-
-        private static int[] CopyIds(IReadOnlyList<int> values)
-        {
-            if (values == null || values.Count == 0)
-                return Array.Empty<int>();
-
-            var items = new int[values.Count];
-            for (int i = 0; i < values.Count; i++)
-            {
-                items[i] = values[i];
-            }
-
-            return items;
-        }
-
-        private static string BuildHighlightKey(bool isNodeLoad, IReadOnlyList<int> ids)
-        {
-            return (isNodeLoad ? "N:" : "M:") + string.Join(",", ids);
         }
 
         private static bool TrySetLoadActive(object loadObj, int loadCaseNo, out string error)

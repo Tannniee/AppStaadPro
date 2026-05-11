@@ -32,14 +32,9 @@ namespace StaadSteelApp.Core.Advance
                 return false;
             }
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                message = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetGeometry(out _, out object geometry, out message))
                 return false;
-            }
 
-            object geometry = os.Geometry;
             if (!AdvanceSelectionService.TryGetNodePoint(geometry, segmentNodeA, out AdvancePoint3D startPoint, out string startError))
             {
                 message = $"Could not read beam segment node {segmentNodeA}: {startError}";

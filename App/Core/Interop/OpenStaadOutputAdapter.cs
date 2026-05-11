@@ -4,6 +4,11 @@ namespace StaadSteelApp.Core.Interop
 {
     internal static class OpenStaadOutputAdapter
     {
+        internal static bool TryGetOutputObject(object openStaad, out object outputObj, out string error)
+        {
+            return OpenStaadAdapterHelpers.TryGetSubObject(openStaad, "Output", out outputObj, out error);
+        }
+
         internal static bool TryGetMemberEndForces(
             object openStaad,
             int memberNo,
@@ -16,8 +21,29 @@ namespace StaadSteelApp.Core.Interop
             forces = new double[6];
             error = string.Empty;
 
-            if (!OpenStaadAdapterHelpers.TryGetSubObject(openStaad, "Output", out object outputObj, out error))
+            if (!TryGetOutputObject(openStaad, out object outputObj, out error))
                 return false;
+
+            return TryGetMemberEndForcesFromOutput(outputObj, memberNo, end, loadCase, globalAxes, out forces, out error);
+        }
+
+        internal static bool TryGetMemberEndForcesFromOutput(
+            object outputObj,
+            int memberNo,
+            int end,
+            int loadCase,
+            bool globalAxes,
+            out double[] forces,
+            out string error)
+        {
+            forces = new double[6];
+            error = string.Empty;
+
+            if (outputObj == null)
+            {
+                error = "Output object is not available.";
+                return false;
+            }
 
             object[] args = new object[]
             {

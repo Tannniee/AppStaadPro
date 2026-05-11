@@ -24,14 +24,9 @@ namespace StaadSteelApp.Core.Advance
                 return false;
             }
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                message = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetGeometry(out _, out object geometry, out message))
                 return false;
-            }
 
-            object geometry = os.Geometry;
             if (!AdvanceSelectionService.TryGetNodePoint(geometry, referenceNodeId, out AdvancePoint3D referencePoint, out string referenceError))
             {
                 message = $"Could not read reference node {referenceNodeId}: {referenceError}";

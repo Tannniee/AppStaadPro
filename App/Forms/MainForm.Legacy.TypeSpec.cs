@@ -36,7 +36,6 @@ namespace StaadSteelApp
                 return;
             }
 
-            // Show Side Panel
             if (_sidePanel == null || _sidePanel.IsDisposed)
             {
                 _sidePanel = new TypeSpecForm();
@@ -44,13 +43,8 @@ namespace StaadSteelApp
             }
 
             var items = isAngle ? GetAngleTypeSpecItems() : isChannel ? GetChannelTypeSpecItems() : GetWideFlangeTypeSpecItems();
-            // Help Removed
 
-            // Preserve current values if re-initializing or pass defaults. 
-            // For simplicity, we pass current _sidePanel values if it was already open/initialized, 
-            // or we could depend on Initialize to handle persistence if we passed the same instance.
-            // But we are reconstructing the list.
-
+            // Preserve current input values while rebuilding the available Type Spec list.
             _sidePanel.Initialize(
                 items,
                 _sidePanel.SelectedItem,

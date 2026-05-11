@@ -11,10 +11,8 @@ namespace StaadSteelApp.Core
     {
         private void MapMaterialProperties(int memberNo, AnalyzedMember am)
         {
-            // Keep robust defaults (avoid unstable COM calls on some OpenSTAAD versions).
-            // STAAD default steel stiffness is typically 205000 MPa, which keeps capacities
-            // aligned with STAAD steel-design output.
-            am.E = 205000; // MPa (Default steel in STAAD)
+            // Use STAAD's default steel stiffness when material properties cannot be read.
+            am.E = 205000; // MPa
             am.Fy = 345;   // MPa (Gr. 50)
             am.Fu = 450;
             am.G = 79000;  // MPa (paired with E=205000, nu~0.30)
@@ -41,7 +39,7 @@ namespace StaadSteelApp.Core
             }
             else
             {
-                // Ex call reported success, but returned no usable values.
+                // GetMaterialPropertyEx reported success but returned no usable values.
                 if (rawE <= 0 && rawFy <= 0 && rawFu <= 0)
                 {
                     WarnOnce($"MaterialAllZero:{materialName}", $"Material '{materialName}': STAAD returned no usable E/Fy/Fu. Defaults will be used.");

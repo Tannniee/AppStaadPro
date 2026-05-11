@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using StaadSteelApp.Core.Interop;
-using Excel = Microsoft.Office.Interop.Excel;
 
 namespace StaadSteelApp.Core
 {
@@ -22,11 +21,23 @@ namespace StaadSteelApp.Core
             }
 
             var result = new Dictionary<string, SectionStat>(StringComparer.OrdinalIgnoreCase);
-            dynamic osDyn = os;
-            dynamic geometry = osDyn.Geometry;
-            dynamic prop = osDyn.Property;
+            if (!OpenStaadAdapterHelpers.TryGetSubObject(os, "Geometry", out object geometry, out string geometryError))
+            {
+                AddError(geometryError);
+                errorCount = localErrorCount;
+                errorSamples = localErrorSamples;
+                return result.Values.ToList();
+            }
 
-            var beamIds = GetAllBeamIds((object)geometry, AddError);
+            if (!OpenStaadAdapterHelpers.TryGetSubObject(os, "Property", out object prop, out string propertyError))
+            {
+                AddError(propertyError);
+                errorCount = localErrorCount;
+                errorSamples = localErrorSamples;
+                return result.Values.ToList();
+            }
+
+            var beamIds = GetAllBeamIds(geometry, AddError);
             var sectionCache = new Dictionary<int, (string Name, string Type, double Area, double Perimeter, double Thickness)>();
             var densityCache = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
 
@@ -58,7 +69,7 @@ namespace StaadSteelApp.Core
                 }
 
                 double length = 0;
-                if (OpenStaadGeometryAdapter.TryGetBeamLengthFromGeometry((object)geometry, beamId, out length, out string lengthError))
+                if (OpenStaadGeometryAdapter.TryGetBeamLengthFromGeometry(geometry, beamId, out length, out string lengthError))
                 {
                     if (length < 0) length = 0;
                 }
@@ -71,13 +82,13 @@ namespace StaadSteelApp.Core
 
                 if (!sectionCache.TryGetValue(propId, out var info))
                 {
-                    info = ResolveSection((object)prop, propId, secName, AddError);
+                    info = ResolveSection(prop, propId, secName, AddError);
                     sectionCache[propId] = info;
                 }
 
                 if (!densityCache.TryGetValue(matName, out double density))
                 {
-                    density = GetDensityKgM3((object)prop, matName, AddError);
+                    density = GetDensityKgM3(prop, matName, AddError);
                     densityCache[matName] = density;
                 }
 

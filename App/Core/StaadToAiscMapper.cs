@@ -16,7 +16,7 @@ namespace StaadSteelApp.Core
         private const double M2ToMm2 = 1000000.0;
         private const double M4ToMm4 = 1000000000000.0;
 
-        private dynamic _os;
+        private readonly object _os;
         private readonly Dictionary<int, Dictionary<string, string>> _memberDesignParamCache =
             new Dictionary<int, Dictionary<string, string>>();
         private List<int> _aiscBriefRefs;
@@ -159,8 +159,6 @@ namespace StaadSteelApp.Core
             // estimate it from the member moment gradient.
             if (!hasDesignCb)
                 MapMomentGradientParameters(memberNo, loadCase, am);
-
-            // Restore units? (Optional, as checking is read-only usually)
 
             if (am.Ag <= 0 || am.Ix <= 0 || am.Iy <= 0)
                 WarnOnce($"SectionPropsInvalid:{memberNo}", $"Member {memberNo}: mapped section properties look invalid (Ag/Ix/Iy <= 0). Results may be meaningless.");

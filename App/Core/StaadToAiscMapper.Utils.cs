@@ -193,7 +193,7 @@ namespace StaadSteelApp.Core
 
             if (parsed <= 0)
             {
-                // Zero typically means "unassigned / use default" in STAAD — skip silently.
+                // Zero typically means "unassigned / use default" in STAAD - skip silently.
                 // Only warn on genuinely negative values, which indicate a real problem.
                 if (parsed < 0)
                     WarnOnce($"DesignParamNegative:{memberNo}:{key}", $"Member {memberNo}: design parameter '{key}' is negative ({parsed}).");

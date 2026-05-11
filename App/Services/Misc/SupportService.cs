@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -10,7 +10,7 @@ using StaadSteelApp.Core.Misc;
 
 namespace StaadSteelApp.Core
 {
-    public static class SupportService
+    public static partial class SupportService
     {
         private const int SupportTypePinned = 1;
         private const int SupportTypeFixed = 2;
@@ -20,37 +20,29 @@ namespace StaadSteelApp.Core
         private const int SupportTypeGeneratedFixedBut = 13;
         private const double SpringTolerance = 1e-9;
 
-        public static void ApplyFixed_Selected()
+        public static ServiceOperationResult ApplyFixed_Selected()
         {
-            ApplySimpleSupportToSelectedNodes(
+            return ApplySimpleSupportToSelectedNodes(
                 supportType: SupportTypeFixed,
                 title: "Support");
         }
 
-        public static void ApplyPinned_Selected()
+        public static ServiceOperationResult ApplyPinned_Selected()
         {
-            ApplySimpleSupportToSelectedNodes(
+            return ApplySimpleSupportToSelectedNodes(
                 supportType: SupportTypePinned,
                 title: "Support");
         }
 
-        public static void RemoveSupport_Selected()
+        public static ServiceOperationResult RemoveSupport_Selected()
         {
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null) return;
-
             if (!TryGetSelectedNodeIds(out int[] nodeIds, out string selectionMessage))
             {
-                TopMostMessageBox.ShowInfo(selectionMessage, "Support");
-                return;
+                return ServiceOperationResult.Info("Support", selectionMessage);
             }
 
-            object openStaad = os;
-            if (!OpenStaadSupportAdapter.TryGetSupportObject(openStaad, out object supportObj, out string supportError))
-            {
-                TopMostMessageBox.ShowError(supportError, "Support");
-                return;
-            }
+            if (!TryGetSupportObject(out object supportObj, out string supportError))
+                return ServiceOperationResult.Error("Support", supportError);
 
             int removedCount = 0;
             var errors = new StringBuilder();
@@ -76,7 +68,7 @@ namespace StaadSteelApp.Core
                 }
             }
 
-            ShowNodeOperationResult(
+            return ShowNodeOperationResult(
                 actionName: "Support",
                 successMessage: $"Support removed from {removedCount}/{nodeIds.Length} node(s).",
                 noOpMessage: "Selected nodes do not have any support assigned.",
@@ -85,15 +77,11 @@ namespace StaadSteelApp.Core
                 errors: errors);
         }
 
-        public static void ApplyFixedBut_Selected(int[] releaseSpec, double[] springSpec)
+        public static ServiceOperationResult ApplyFixedBut_Selected(int[] releaseSpec, double[] springSpec)
         {
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null) return;
-
             if (!TryGetSelectedNodeIds(out int[] nodeIds, out string selectionMessage))
             {
-                TopMostMessageBox.ShowInfo(selectionMessage, "Support");
-                return;
+                return ServiceOperationResult.Info("Support", selectionMessage);
             }
 
             int[] normalizedRelease = NormalizeReleaseSpec(releaseSpec);
@@ -102,18 +90,13 @@ namespace StaadSteelApp.Core
 
             if (!HasAnyFixedButDefinition(desiredStates, normalizedSpring))
             {
-                TopMostMessageBox.ShowWarning(
-                    "Please define at least one release or spring stiffness.",
-                    "Fixed But");
-                return;
+                return ServiceOperationResult.Warning(
+                    "Fixed But",
+                    "Please define at least one release or spring stiffness.");
             }
 
-            object openStaad = os;
-            if (!OpenStaadSupportAdapter.TryGetSupportObject(openStaad, out object supportObj, out string supportError))
-            {
-                TopMostMessageBox.ShowError(supportError, "Fixed But");
-                return;
-            }
+            if (!TryGetSupportObject(out object supportObj, out string supportError))
+                return ServiceOperationResult.Error("Fixed But", supportError);
 
             int supportId = FindExistingSupportId(
                 supportObj,
@@ -130,12 +113,11 @@ namespace StaadSteelApp.Core
                     string message = string.IsNullOrWhiteSpace(createError)
                         ? "Could not create Fixed But support."
                         : "Could not create Fixed But support: " + createError;
-                    TopMostMessageBox.ShowError(message, "Fixed But");
-                    return;
+                    return ServiceOperationResult.Error("Fixed But", message);
                 }
             }
 
-            AssignSupportAndReport(
+            return AssignSupportAndReport(
                 supportObj,
                 nodeIds,
                 supportId,
@@ -144,23 +126,15 @@ namespace StaadSteelApp.Core
                 reusedExisting: reusedExisting);
         }
 
-        private static void ApplySimpleSupportToSelectedNodes(int supportType, string title)
+        private static ServiceOperationResult ApplySimpleSupportToSelectedNodes(int supportType, string title)
         {
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null) return;
-
             if (!TryGetSelectedNodeIds(out int[] nodeIds, out string selectionMessage))
             {
-                TopMostMessageBox.ShowInfo(selectionMessage, title);
-                return;
+                return ServiceOperationResult.Info(title, selectionMessage);
             }
 
-            object openStaad = os;
-            if (!OpenStaadSupportAdapter.TryGetSupportObject(openStaad, out object supportObj, out string supportError))
-            {
-                TopMostMessageBox.ShowError(supportError, title);
-                return;
-            }
+            if (!TryGetSupportObject(out object supportObj, out string supportError))
+                return ServiceOperationResult.Error(title, supportError);
 
             int supportId = FindExistingSupportId(supportObj, supportType, desiredStates: null, desiredSprings: null);
             bool reusedExisting = supportId > 0;
@@ -174,12 +148,11 @@ namespace StaadSteelApp.Core
                     string message = string.IsNullOrWhiteSpace(createError)
                         ? $"Could not create {kind} support."
                         : $"Could not create {kind} support: {createError}";
-                    TopMostMessageBox.ShowError(message, title);
-                    return;
+                    return ServiceOperationResult.Error(title, message);
                 }
             }
 
-            AssignSupportAndReport(
+            return AssignSupportAndReport(
                 supportObj,
                 nodeIds,
                 supportId,
@@ -188,7 +161,7 @@ namespace StaadSteelApp.Core
                 reusedExisting: reusedExisting);
         }
 
-        private static void AssignSupportAndReport(
+        private static ServiceOperationResult AssignSupportAndReport(
             object supportObj,
             int[] nodeIds,
             int supportId,
@@ -213,7 +186,7 @@ namespace StaadSteelApp.Core
 
             string origin = reusedExisting ? "reused existing support" : "created new support";
             string successMessage = $"{successVerb} to {assignedCount}/{nodeIds.Length} node(s) ({origin} #{supportId}).";
-            ShowNodeOperationResult(
+            return ShowNodeOperationResult(
                 actionName: successTitle,
                 successMessage: successMessage,
                 noOpMessage: "No node was updated.",
@@ -222,7 +195,7 @@ namespace StaadSteelApp.Core
                 errors: errors);
         }
 
-        private static void ShowNodeOperationResult(
+        private static ServiceOperationResult ShowNodeOperationResult(
             string actionName,
             string successMessage,
             string noOpMessage,
@@ -233,14 +206,12 @@ namespace StaadSteelApp.Core
             string errorText = errors.ToString().Trim();
             if (removedOrAssignedCount == totalCount && string.IsNullOrEmpty(errorText))
             {
-                TopMostMessageBox.ShowSuccess(successMessage, actionName);
-                return;
+                return ServiceOperationResult.Success(actionName, successMessage);
             }
 
             if (removedOrAssignedCount <= 0 && string.IsNullOrEmpty(errorText))
             {
-                TopMostMessageBox.ShowInfo(noOpMessage, actionName);
-                return;
+                return ServiceOperationResult.Info(actionName, noOpMessage);
             }
 
             var message = new StringBuilder();
@@ -249,7 +220,7 @@ namespace StaadSteelApp.Core
             if (!string.IsNullOrEmpty(errorText))
                 message.Append(errorText);
 
-            TopMostMessageBox.ShowWarning(message.ToString().Trim(), actionName);
+            return ServiceOperationResult.Warning(actionName, message.ToString().Trim());
         }
 
         private static bool TryGetSelectedNodeIds(out int[] nodeIds, out string message)
@@ -257,151 +228,20 @@ namespace StaadSteelApp.Core
             return MiscSelectionService.TryGetSelectedNodeIds(out nodeIds, out message);
         }
 
-        private static int FindExistingSupportId(
-            object supportObj,
-            int targetSupportType,
-            int[] desiredStates,
-            double[] desiredSprings)
+        private static bool TryGetSupportObject(out object supportObj, out string error)
         {
-            if (!TryGetSupportedNodeIds(supportObj, out int[] supportedNodeIds, out string error))
+            supportObj = null;
+            if (!StaadManager.TryGetOpenSTAAD(out object openStaad, out string connectionError))
             {
-                Debug.WriteLine("Support scan skipped: " + error);
-                return 0;
-            }
-
-            var seenSupportIds = new HashSet<int>();
-            foreach (int nodeId in supportedNodeIds)
-            {
-                int assignedType = 0;
-                if (targetSupportType != SupportTypeFixedBut &&
-                    !TryGetSupportType(supportObj, nodeId, out assignedType, out string typeError))
-                {
-                    Debug.WriteLine($"Support scan ignored node {nodeId}: {typeError}");
-                    continue;
-                }
-
-                if (targetSupportType != SupportTypeFixedBut &&
-                    !IsMatchingSupportType(assignedType, targetSupportType))
-                {
-                    continue;
-                }
-
-                if (!TryGetSupportDefinition(supportObj, nodeId, out SupportDefinition definition, out string infoError))
-                {
-                    Debug.WriteLine($"Support scan ignored node {nodeId}: {infoError}");
-                    continue;
-                }
-
-                if (!seenSupportIds.Add(definition.SupportId))
-                    continue;
-
-                if (!IsMatchingSupportType(definition.SupportType, targetSupportType))
-                    continue;
-
-                if (targetSupportType == SupportTypeFixedBut &&
-                    !IsMatchingFixedButDefinition(definition, desiredStates, desiredSprings))
-                {
-                    continue;
-                }
-
-                return definition.SupportId;
-            }
-
-            return 0;
-        }
-
-        private static bool IsMatchingSupportType(int existingSupportType, int targetSupportType)
-        {
-            switch (targetSupportType)
-            {
-                case SupportTypePinned:
-                    return existingSupportType == SupportTypePinned || existingSupportType == SupportTypeGeneratedPinned;
-                case SupportTypeFixed:
-                    return existingSupportType == SupportTypeFixed || existingSupportType == SupportTypeGeneratedFixed;
-                case SupportTypeFixedBut:
-                    return existingSupportType == SupportTypeFixedBut || existingSupportType == SupportTypeGeneratedFixedBut;
-                default:
-                    return existingSupportType == targetSupportType;
-            }
-        }
-
-        private static bool IsMatchingFixedButDefinition(
-            SupportDefinition existing,
-            int[] desiredStates,
-            double[] desiredSprings)
-        {
-            if (desiredStates == null || desiredSprings == null)
+                Debug.WriteLine(connectionError);
+                error = connectionError;
                 return false;
-
-            for (int i = 0; i < 6; i++)
-            {
-                if (existing.ReleaseStates[i] != desiredStates[i])
-                    return false;
-
-                if (Math.Abs(existing.SpringSpec[i] - desiredSprings[i]) > SpringTolerance)
-                    return false;
             }
 
-            return true;
-        }
-
-        private static bool HasAnyFixedButDefinition(int[] desiredStates, double[] desiredSprings)
-        {
-            for (int i = 0; i < 6; i++)
-            {
-                if (desiredStates[i] != 0)
-                    return true;
-
-                if (Math.Abs(desiredSprings[i]) > SpringTolerance)
-                    return true;
-            }
+            if (OpenStaadSupportAdapter.TryGetSupportObject(openStaad, out supportObj, out error))
+                return true;
 
             return false;
-        }
-
-        private static int[] NormalizeReleaseSpec(int[] input)
-        {
-            var result = new int[6];
-            if (input == null)
-                return result;
-
-            for (int i = 0; i < result.Length && i < input.Length; i++)
-                result[i] = input[i] != 0 ? 1 : 0;
-
-            return result;
-        }
-
-        private static double[] NormalizeSpringSpec(double[] input)
-        {
-            var result = new double[6];
-            if (input == null)
-                return result;
-
-            for (int i = 0; i < result.Length && i < input.Length; i++)
-            {
-                double value = input[i];
-                result[i] = Math.Abs(value) <= SpringTolerance ? 0.0 : value;
-            }
-
-            return result;
-        }
-
-        private static int[] BuildDesiredSupportStates(int[] releaseSpec, double[] springSpec)
-        {
-            var states = new int[6];
-            for (int i = 0; i < states.Length; i++)
-            {
-                if (Math.Abs(springSpec[i]) > SpringTolerance)
-                {
-                    states[i] = -1;
-                }
-                else
-                {
-                    states[i] = releaseSpec[i] != 0 ? 1 : 0;
-                }
-            }
-
-            return states;
         }
 
         private static int CreateSimpleSupport(object supportObj, int supportType, out string error)

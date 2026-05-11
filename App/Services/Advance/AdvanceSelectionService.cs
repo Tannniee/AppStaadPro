@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using StaadSteelApp.Core.Interop;
 
 namespace StaadSteelApp.Core.Advance
@@ -12,14 +11,9 @@ namespace StaadSteelApp.Core.Advance
             nodeIds = Array.Empty<int>();
             error = string.Empty;
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                error = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetOpenStaad(out object openStaad, out error))
                 return false;
-            }
 
-            object openStaad = os;
             int ignoredInvalidCount;
             if (!OpenStaadSelectionAdapter.TryGetSelectedNodeIds(
                     openStaad,
@@ -41,14 +35,9 @@ namespace StaadSteelApp.Core.Advance
             nodeIds = Array.Empty<int>();
             error = string.Empty;
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                error = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetOpenStaad(out object openStaad, out error))
                 return false;
-            }
 
-            object openStaad = os;
             if (!OpenStaadSelectionAdapter.TryGetSelectedNodeIds(
                     openStaad,
                     true,
@@ -74,15 +63,9 @@ namespace StaadSteelApp.Core.Advance
             nodeIds = Array.Empty<int>();
             message = string.Empty;
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                message = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetGeometry(out object openStaad, out object geometry, out message))
                 return false;
-            }
 
-            object openStaad = os;
-            object geometry = os.Geometry;
             if (!OpenStaadSelectionAdapter.TryGetSelectedBeamIds(
                     openStaad,
                     true,
@@ -143,14 +126,9 @@ namespace StaadSteelApp.Core.Advance
             beamId = 0;
             message = string.Empty;
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                message = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetOpenStaad(out object openStaad, out message))
                 return false;
-            }
 
-            object openStaad = os;
             if (!OpenStaadSelectionAdapter.TryGetSelectedBeamIds(
                     openStaad,
                     true,
@@ -176,22 +154,17 @@ namespace StaadSteelApp.Core.Advance
 
         internal static string GetCoordinateLengthUnitLabel()
         {
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
+            if (!AdvanceOpenStaadService.TryGetOpenStaad(out object openStaad, out _))
                 return "?";
 
-            try
-            {
-                int baseUnit = Convert.ToInt32(os.GetBaseUnit(), CultureInfo.InvariantCulture);
-                if (baseUnit == AdvanceConstants.BaseUnitMetric)
-                    return "m";
+            if (!OpenStaadModelAdapter.TryGetBaseUnit(openStaad, out int baseUnit, out _))
+                return "?";
 
-                if (baseUnit == AdvanceConstants.BaseUnitEnglish)
-                    return "in";
-            }
-            catch
-            {
-            }
+            if (baseUnit == AdvanceConstants.BaseUnitMetric)
+                return "m";
+
+            if (baseUnit == AdvanceConstants.BaseUnitEnglish)
+                return "in";
 
             return "?";
         }

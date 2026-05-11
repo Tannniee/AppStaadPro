@@ -10,7 +10,7 @@ namespace StaadSteelApp
 {
     public partial class MainForm : Form
     {
-        // Flag to prevent UpdateName during programmatic population
+        // Suppresses name recalculation while controls are populated programmatically.
         private bool _isPopulating = false;
         private bool _materialListLoaded = false;
         private TypeSpecForm _sidePanel;
@@ -19,6 +19,7 @@ namespace StaadSteelApp
         private UsedSectionsForm _usedSectionsForm;
         private AdvanceAlignForm _advanceForm;
         private AssignLoadForm _assignLoadForm;
+        private GroupsForm _groupsForm;
         private Timer _usedSectionsHighlightTimer;
         private int[] _pendingUsedSectionPropertyIds;
         private int[] _pendingUsedSectionBeamIds;
@@ -27,34 +28,18 @@ namespace StaadSteelApp
         {
             InitializeComponent();
             
-            // Check for Design Mode (Robust)
+            // Skip runtime wiring while the WinForms designer is loading the form.
             if (LicenseManager.UsageMode == LicenseUsageMode.Designtime) return;
 
-            // Setup events
+            // Runtime startup wiring.
             this.Load += (s,e) => 
             {
                 InitializeLegacyService();
-                LoadLegacyZones();  // Initial legacy load
+                LoadLegacyZones();
 
-                // Initialize Status Panel (Persistent)
-                _statusPanel = StatusForm.Instance;
-                if (_statusPanel == null || _statusPanel.IsDisposed)
-                {
-                    _statusPanel = new StatusForm();
-                }
+                InitializeStatusPanel();
 
-                if (_statusPanel.Owner != this)
-                {
-                    this.AddOwnedForm(_statusPanel);
-                }
-                UpdateStatusPanelPos();
-                _statusPanel.Hide(); // Default hidden; it will auto-show on messages
-
-                if (_usedSectionsHighlightTimer == null)
-                {
-                    _usedSectionsHighlightTimer = new Timer { Interval = 120 };
-                    _usedSectionsHighlightTimer.Tick += UsedSectionsHighlightTimer_Tick;
-                }
+                InitializeUsedSectionsHighlightTimer();
 
                 BeginInvoke(new Action(() =>
                 {
@@ -63,21 +48,15 @@ namespace StaadSteelApp
                 }));
             };
 
-            // Keep status panel aligned
+            // Keep owned tool panels aligned with the main form.
             this.Move += (s, e) => { UpdateStatusPanelPos(); UpdateMiscPanelLocation(); };
             this.Resize += (s, e) => { UpdateStatusPanelPos(); UpdateMiscPanelLocation(); };
 
-
-
-
-        // --- Clipboard ---
-        // Moved to SectionClipboard.cs and MainForm.Clipboard.cs
-           
             // Code shows source (Prismatic/Legacy), Name is auto-generated from dimensions
             txtName.ReadOnly = true;
             txtCode.ReadOnly = true;
 
-            // Wire ComboBox
+            // Recalculate dimensions and generated names when the section type changes.
             cboType.SelectedIndexChanged += (s, e) => { UpdateVisibility(); UpdateName(); };
             
             EventHandler textChanged = (s, e) => UpdateName();
@@ -89,13 +68,13 @@ namespace StaadSteelApp
             txtBfb.TextChanged += textChanged;
             txtTfb.TextChanged += textChanged;
             
-            // New field Dis
+            // Distance parameter used by supported prismatic section types.
             txtDis.TextChanged += textChanged;
             
-            // Setup behaviors for input fields
+            // Apply shared input-field behavior.
             SetupInputFields();
 
-            // Default
+            // Initial section type.
             if (cboType.Items.Count > 0) cboType.SelectedIndex = 0;
             UpdateVisibility();
             
@@ -144,51 +123,10 @@ namespace StaadSteelApp
             _usedSectionsForm?.Close();
             _advanceForm?.Close();
             _assignLoadForm?.Close();
-            _usedSectionsHighlightTimer?.Stop();
-            _usedSectionsHighlightTimer?.Dispose();
-            _statusPanel?.Close();
+            _groupsForm?.Close();
+            DisposeUsedSectionsHighlightTimer();
+            CloseStatusPanel();
             base.OnFormClosing(e);
-        }
-
-        private void UsedSectionsHighlightTimer_Tick(object sender, EventArgs e)
-        {
-            _usedSectionsHighlightTimer?.Stop();
-
-            int[] beamIds = _pendingUsedSectionBeamIds;
-            int[] propertyIds = _pendingUsedSectionPropertyIds;
-            _pendingUsedSectionBeamIds = null;
-            _pendingUsedSectionPropertyIds = null;
-            if ((beamIds == null || beamIds.Length == 0) &&
-                (propertyIds == null || propertyIds.Length == 0))
-                return;
-
-            if (_isRefreshingUsedSections || _usedSectionsForm == null || _usedSectionsForm.IsDisposed)
-                return;
-
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-                return;
-
-            if (beamIds != null && beamIds.Length > 0)
-            {
-                if (SectionService.HighlightBeamIds(os, beamIds, out string beamError))
-                    return;
-
-                if (propertyIds == null || propertyIds.Length == 0)
-                {
-                    TopMostMessageBox.ShowWarning(beamError, "Used Sections");
-                    return;
-                }
-            }
-
-            if (propertyIds != null && propertyIds.Length > 0)
-            {
-                string propertyError;
-                if (!SectionService.HighlightUsedSections(os, propertyIds, out propertyError))
-                {
-                    TopMostMessageBox.ShowWarning(propertyError, "Used Sections");
-                }
-            }
         }
 
         internal void ResetWindowToCenter()
@@ -213,16 +151,6 @@ namespace StaadSteelApp
             Focus();
         }
 
-        private void UpdateStatusPanelPos()
-        {
-            if (_statusPanel != null && !_statusPanel.IsDisposed && !this.Disposing)
-            {
-                // Position: Right side of MainForm, Top aligned
-                // Overlap -5px to match TypeSpec side panel style
-                _statusPanel.Location = new System.Drawing.Point(this.Right - 5, this.Top);
-            }
-        }
-
         private void UpdateMiscPanelLocation()
         {
             if (_miscPanel == null || _miscPanel.IsDisposed || !_miscPanel.Visible) return;
@@ -240,13 +168,13 @@ namespace StaadSteelApp
         {
             string currentSelection = cboType.SelectedItem?.ToString();
             
-            // Tat cap nhat ten de tranh loi thay doi Text lien tuc
+            // Disable name updates while the type list is being rebuilt.
             _isPopulating = true;
             cboType.Items.Clear();
 
             if (chkUPT.Checked)
             {
-                // Cac loai tiet dien UPT theo OpenSTAAD
+                // UPT section types supported through OpenSTAAD.
                 cboType.Items.AddRange(new object[] {
                     "WIDE FLANGE",
                     "CHANNEL",
@@ -262,7 +190,7 @@ namespace StaadSteelApp
             }
             else
             {
-                // Cac loai tiet dien mac dinh cua app
+                // Default app section types.
                 cboType.Items.AddRange(new object[] {
                     "Tapered I",
                     "Circle",
@@ -275,7 +203,7 @@ namespace StaadSteelApp
                 });
             }
 
-            // Thu giu lai lua chon cu neu co trong danh sach moi (vi du: "Tee" <-> "TEE")
+            // Preserve the current type when the rebuilt list contains an equivalent entry.
             if (!string.IsNullOrEmpty(currentSelection))
             {
                 for (int i = 0; i < cboType.Items.Count; i++)
@@ -288,7 +216,7 @@ namespace StaadSteelApp
                 }
             }
 
-            // Neu khong match duoc, chon phan tu dau tien
+            // Fall back to the first available type when the previous type is not available.
             if (cboType.SelectedIndex == -1 && cboType.Items.Count > 0)
             {
                 cboType.SelectedIndex = 0;
@@ -296,7 +224,7 @@ namespace StaadSteelApp
 
             _isPopulating = false;
             
-            // Kich hoat cap nhat UI
+            // Refresh dependent UI after the type list changes.
             UpdateVisibility();
             UpdateName();
 
@@ -304,9 +232,9 @@ namespace StaadSteelApp
             {
                 try
                 {
-                    var os = StaadManager.GetOpenSTAAD();
+                    TryGetMainOpenStaad(out object openStaad);
                     string preferredMaterial = string.IsNullOrWhiteSpace(cboMaterial.Text) ? "None" : cboMaterial.Text;
-                    EnsureMaterialListLoaded(os, preferredMaterial);
+                    EnsureMaterialListLoaded(openStaad, preferredMaterial);
                 }
                 catch (Exception ex)
                 {

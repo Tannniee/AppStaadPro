@@ -22,43 +22,8 @@ namespace StaadSteelApp
             TopMostMessageBox.ShowWarning(ex == null ? message : (message + "\n" + ex.Message), "STAAD Warning");
         }
 
-        private class DesignResultInfo
-        {
-            public string DesignCode { get; set; }
-            public string DesignStatus { get; set; }
-            public double CriticalRatio { get; set; }
-            public double AllowableRatio { get; set; }
-            public int CriticalLoadCase { get; set; }
-            public double CriticalSection { get; set; }
-            public string CriticalClause { get; set; }
-            public string DesignSection { get; set; }
-            public double[] DesignForces { get; set; }
-            public double KLByR { get; set; }
-        }
-
-        private class TaperedSectionData
-        {
-            public double H1 { get; set; }   // m
-            public double H2 { get; set; }   // m
-            public double Tw { get; set; }   // m
-            public double Bf { get; set; }   // m
-            public double Tf { get; set; }   // m
-            public double Bfb { get; set; }  // m
-            public double Tfb { get; set; }  // m
-        }
-
-        private class ForceEnvelopeEntry
-        {
-            public string Label { get; set; }
-            public double Value { get; set; }
-            public int LoadCase { get; set; }
-            public string Station { get; set; }
-            public string Unit { get; set; }
-            public bool IsSampled { get; set; }
-        }
-
         private List<MemberForceData> _allForces;
-        private dynamic _os;
+        private object _os;
         private DesignResults _currentResults;
         private Dictionary<string, CheckDetail> _checkMap = new Dictionary<string, CheckDetail>();
         private System.Windows.Forms.Timer _selectionTimer;
@@ -75,7 +40,6 @@ namespace StaadSteelApp
         {
             InitializeComponent();
             
-            // Event Handlers
             this.cboFrame.SelectedIndexChanged += new System.EventHandler(this.cboFrame_SelectedIndexChanged);
             this.dgvSummary.SelectionChanged += new System.EventHandler(this.dgvSummary_SelectionChanged);
             this.btnClose.Click += (s, e) => this.Close();
@@ -89,7 +53,6 @@ namespace StaadSteelApp
 
             InitializeAutoDetect();
             
-            // Add Diagnostics Button Dynamically
             var btnDiag = new Button();
             btnDiag.Text = "Self-Diag";
             btnDiag.Size = new Size(80, 26);
@@ -112,7 +75,6 @@ namespace StaadSteelApp
 
             if (_allForces == null || _allForces.Count == 0) return;
 
-            // Populate Combo with unique member numbers
             var members = _allForces.Select(f => f.MemberNo).Distinct().OrderBy(m => m).ToList();
             
             cboFrame.Items.Clear();
@@ -127,13 +89,8 @@ namespace StaadSteelApp
 
         private void CheckForm_Load(object sender, EventArgs e)
         {
-            if (_os == null)
-                _os = StaadManager.GetOpenSTAAD();
-
-            if (_os == null)
+            if (_os == null && !TryGetCheckOpenStaad(out _os))
             {
-                MessageBox.Show("Cannot connect to STAAD.Pro. Please ensure STAAD.Pro is running.",
-                    "Connection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 Close();
                 return;
             }
@@ -153,7 +110,6 @@ namespace StaadSteelApp
         {
             if (cboFrame.SelectedIndex < 0) return;
             
-            // Trigger calculation
             if (int.TryParse(cboFrame.SelectedItem.ToString(), out int memberNo))
                 UpdateBuiltUpOption(memberNo);
             PerformCalculation();

@@ -6,7 +6,7 @@ namespace StaadSteelApp.Core
 {
     public static partial class SectionService
     {
-        public static int[] GetSelectedBeamIDsSafe(dynamic os, out string error)
+        public static int[] GetSelectedBeamIDsSafe(object os, out string error)
         {
             error = string.Empty;
             if (os == null)
@@ -14,7 +14,11 @@ namespace StaadSteelApp.Core
 
             try
             {
-                return GetSelectedBeamIDs(os.Geometry, out error);
+                object openStaad = os;
+                if (!TryGetSectionGeometry(openStaad, out object geometryObj, out error))
+                    return Array.Empty<int>();
+
+                return GetSelectedBeamIDs(geometryObj, out error);
             }
             catch (Exception ex)
             {
@@ -23,21 +27,20 @@ namespace StaadSteelApp.Core
             }
         }
 
-        private static int[] GetSelectedBeamIDs(dynamic geometry)
+        private static int[] GetSelectedBeamIDs(object geometry)
         {
             string ignoredError;
             return GetSelectedBeamIDs(geometry, out ignoredError);
         }
 
-        private static int[] GetSelectedBeamIDs(dynamic geometry, out string error)
+        private static int[] GetSelectedBeamIDs(object geometry, out string error)
         {
             error = string.Empty;
             if (geometry == null)
                 return Array.Empty<int>();
 
-            object geometryObj = geometry;
             if (OpenStaadSelectionAdapter.TryGetSelectedAnalyticalBeamIdsFromGeometry(
-                    geometryObj,
+                    geometry,
                     true,
                     out int[] beamIds,
                     out error))

@@ -86,7 +86,7 @@ namespace StaadSteelApp.AISC360
                  var results = AISC360Calculator.PerformAllChecks(input);
                  double cap = results.FlexureCheckMajor.Capacity;
                  bool isLtb = results.FlexureCheckMajor.Messages.Contains("Elastic LTB");
-                 // Just report the value for manual verification as exact LTB is complex to hardcode here without full math
+                 // Report the value for manual verification; exact LTB benchmarking is handled separately.
                  sb.AppendLine($"  C3: Elastic LTB Capacity: {cap:F2} kN-m. (Manual Check Required).");
                  passed++;
              }

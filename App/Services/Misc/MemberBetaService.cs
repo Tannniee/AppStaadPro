@@ -10,17 +10,20 @@ namespace StaadSteelApp.Core.Misc
     {
         private const string CellLocalAxesDeg = "D12";
 
-        internal static void ApplyBetaAngleSelected(Worksheet ws)
+        internal static ServiceOperationResult ApplyBetaAngleSelected(Worksheet ws)
         {
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null) return;
+            if (!MiscOpenStaadService.TryGetProperty(out object propObj, out string propertyError))
+            {
+                Debug.WriteLine(propertyError);
+                return ServiceOperationResult.Error("Beta Angle", propertyError);
+            }
 
             if (!MiscSelectionService.TryGetSelectedBeamIds(out int[] beamIds, out _))
-                return;
+                return ServiceOperationResult.Info("Beta Angle", "Could not read STAAD selection.");
 
             int beamCount = beamIds.Length;
             if (beamCount == 0)
-                return;
+                return ServiceOperationResult.Info("Beta Angle", "Please select beams in STAAD.");
 
             double angle;
             object raw = null;
@@ -31,33 +34,34 @@ namespace StaadSteelApp.Core.Misc
             catch (Exception ex)
             {
                 Debug.WriteLine("Read beta angle from Excel failed: " + ex);
-                TopMostMessageBox.ShowError("Could not read beta angle from Excel: " + ex.Message, "Beta Angle");
-                return;
+                AppLogger.Exception("Could not read beta angle from Excel.", ex);
+                return ServiceOperationResult.Error("Beta Angle", "Could not read beta angle from Excel: " + ex.Message);
             }
 
             if (!TryParseAngle(raw, out angle))
             {
-                TopMostMessageBox.ShowWarning("Angle must be a number.", "Beta Angle");
-                return;
+                return ServiceOperationResult.Warning("Beta Angle", "Angle must be a number.");
             }
 
             string assignError;
-            OpenStaadPropertyAdapter.AssignBetaAngle(os.Property, beamIds, angle, out assignError);
-            TopMostMessageBox.ShowSuccess($"Beta Angle {angle} deg applied to {beamCount} beams.", "Beta Angle");
+            OpenStaadPropertyAdapter.AssignBetaAngle(propObj, beamIds, angle, out assignError);
+            return ServiceOperationResult.Success("Beta Angle", $"Beta Angle {angle} deg applied to {beamCount} beams.");
         }
 
-        internal static void ApplyBetaAngleSelected(double angle)
+        internal static ServiceOperationResult ApplyBetaAngleSelected(double angle)
         {
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null) return;
+            if (!MiscOpenStaadService.TryGetProperty(out object propObj, out string propertyError))
+            {
+                Debug.WriteLine(propertyError);
+                return ServiceOperationResult.Error("Beta Angle", propertyError);
+            }
 
             if (!MiscSelectionService.TryGetSelectedBeamIds(out int[] beamIds, out string selectionError))
             {
                 string message = string.IsNullOrWhiteSpace(selectionError)
                     ? "Could not read STAAD selection."
                     : selectionError;
-                TopMostMessageBox.ShowInfo(message, "Info");
-                return;
+                return ServiceOperationResult.Info("Beta Angle", message);
             }
 
             int beamCount = beamIds.Length;
@@ -66,28 +70,25 @@ namespace StaadSteelApp.Core.Misc
                 string message = string.IsNullOrWhiteSpace(selectionError)
                     ? "Please select beams in STAAD."
                     : "Could not read STAAD selection: " + selectionError;
-                TopMostMessageBox.ShowInfo(message, "Info");
-                return;
+                return ServiceOperationResult.Info("Beta Angle", message);
             }
 
             if (Math.Abs(angle) < 1e-9)
             {
-                TopMostMessageBox.ShowInfo(
-                    "Beta angle reset to 0 is unstable via OpenSTAAD on this setup. Please clear Local Axes manually in STAAD.",
-                    "Beta Angle");
-                return;
+                return ServiceOperationResult.Info(
+                    "Beta Angle",
+                    "Beta angle reset to 0 is unstable via OpenSTAAD on this setup. Please clear Local Axes manually in STAAD.");
             }
 
-            bool success = TryAssignBetaAngle(os.Property, beamIds, angle, out string errorLog);
+            bool success = TryAssignBetaAngle(propObj, beamIds, angle, out string errorLog);
             if (success)
             {
-                TopMostMessageBox.ShowSuccess($"Beta Angle {angle} deg applied to {beamCount} beams.", "Beta Angle");
-                return;
+                return ServiceOperationResult.Success("Beta Angle", $"Beta Angle {angle} deg applied to {beamCount} beams.");
             }
 
             string shortLog = errorLog.Length > 200 ? errorLog.Substring(0, 200) + "..." : errorLog;
-            TopMostMessageBox.ShowWarning($"Beta Angle applied with some errors:\n{shortLog}", "Beta Angle Warning");
             Debug.WriteLine(errorLog);
+            return ServiceOperationResult.Warning("Beta Angle Warning", $"Beta Angle applied with some errors:\n{shortLog}");
         }
 
         private static bool TryParseAngle(object raw, out double angle)

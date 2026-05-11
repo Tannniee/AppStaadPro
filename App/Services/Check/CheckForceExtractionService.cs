@@ -26,8 +26,96 @@ namespace StaadSteelApp.Core.Check
         internal bool HasForces => Forces.Count > 0;
     }
 
+    internal enum CheckPreparationMessageKind
+    {
+        None,
+        Info,
+        Error
+    }
+
+    internal sealed class CheckPreparationResult
+    {
+        private CheckPreparationResult(
+            bool canOpenCheckForm,
+            CheckPreparationMessageKind messageKind,
+            string userMessage,
+            int selectedBeamCount,
+            CheckForceExtractionResult extraction)
+        {
+            CanOpenCheckForm = canOpenCheckForm;
+            MessageKind = messageKind;
+            UserMessage = userMessage ?? string.Empty;
+            SelectedBeamCount = selectedBeamCount;
+            Extraction = extraction;
+        }
+
+        internal bool CanOpenCheckForm { get; }
+        internal CheckPreparationMessageKind MessageKind { get; }
+        internal string UserMessage { get; }
+        internal int SelectedBeamCount { get; }
+        internal CheckForceExtractionResult Extraction { get; }
+
+        internal static CheckPreparationResult Ready(int selectedBeamCount, CheckForceExtractionResult extraction)
+        {
+            return new CheckPreparationResult(true, CheckPreparationMessageKind.None, string.Empty, selectedBeamCount, extraction);
+        }
+
+        internal static CheckPreparationResult Info(string message, int selectedBeamCount = 0, CheckForceExtractionResult extraction = null)
+        {
+            return new CheckPreparationResult(false, CheckPreparationMessageKind.Info, message, selectedBeamCount, extraction);
+        }
+
+        internal static CheckPreparationResult Error(string message)
+        {
+            return new CheckPreparationResult(false, CheckPreparationMessageKind.Error, message, 0, null);
+        }
+    }
+
     internal static class CheckForceExtractionService
     {
+        internal static CheckPreparationResult PrepareSelectedMemberEndForces(
+            object openStaad,
+            Action<int> selectedBeamCountAvailable = null)
+        {
+            if (!TryGetSelectedBeamIds(openStaad, out int[] selectedBeams, out string selectionError))
+                return CheckPreparationResult.Error("Could not read selected beams: " + selectionError);
+
+            if (selectedBeams.Length == 0)
+                return CheckPreparationResult.Info("No beams selected in STAAD.");
+
+            selectedBeamCountAvailable?.Invoke(selectedBeams.Length);
+
+            CheckForceExtractionResult extraction = ExtractEndForces(openStaad, selectedBeams);
+            if (!extraction.HasForces)
+            {
+                if (string.Equals(extraction.ErrorSummary, "No load cases found.", StringComparison.OrdinalIgnoreCase))
+                    return CheckPreparationResult.Info("No load cases found.", selectedBeams.Length, extraction);
+
+                string message = string.IsNullOrWhiteSpace(extraction.ErrorSummary)
+                    ? "No forces found for selected beams."
+                    : "No forces found for selected beams. " + extraction.ErrorSummary;
+                return CheckPreparationResult.Info(message, selectedBeams.Length, extraction);
+            }
+
+            return CheckPreparationResult.Ready(selectedBeams.Length, extraction);
+        }
+
+        internal static bool TryGetSelectedBeamIds(object openStaad, out int[] selectedBeamIds, out string error)
+        {
+            return TryGetSelectedBeamIds(openStaad, new[] { 1, 0 }, out selectedBeamIds, out error);
+        }
+
+        internal static bool TryGetSelectedBeamIds(object openStaad, int[] sortFlags, out int[] selectedBeamIds, out string error)
+        {
+            return OpenStaadSelectionAdapter.TryGetSelectedBeamIds(
+                openStaad,
+                false,
+                false,
+                sortFlags ?? new[] { 1, 0 },
+                out selectedBeamIds,
+                out error);
+        }
+
         internal static bool TryGetAllLoadCases(object openStaad, out int[] loadCases, out string error)
         {
             return OpenStaadLoadAdapter.TryGetAllLoadCaseNumbers(openStaad, out loadCases, out error);
@@ -48,6 +136,9 @@ namespace StaadSteelApp.Core.Check
             if (loadCases.Length == 0)
                 return new CheckForceExtractionResult(Array.Empty<MemberForceData>(), loadCases, 0, "No load cases found.");
 
+            if (!OpenStaadOutputAdapter.TryGetOutputObject(openStaad, out object outputObj, out string outputError))
+                return new CheckForceExtractionResult(Array.Empty<MemberForceData>(), loadCases, 0, outputError);
+
             var results = new List<MemberForceData>(beams.Length * loadCases.Length * 2);
             int errors = 0;
 
@@ -55,8 +146,8 @@ namespace StaadSteelApp.Core.Check
             {
                 foreach (int loadCase in loadCases)
                 {
-                    if (OpenStaadOutputAdapter.TryGetMemberEndForces(
-                            openStaad,
+                    if (OpenStaadOutputAdapter.TryGetMemberEndForcesFromOutput(
+                            outputObj,
                             beamNo,
                             0,
                             loadCase,
@@ -72,8 +163,8 @@ namespace StaadSteelApp.Core.Check
                         LogForceReadError("start", beamNo, loadCase, startError, errors);
                     }
 
-                    if (OpenStaadOutputAdapter.TryGetMemberEndForces(
-                            openStaad,
+                    if (OpenStaadOutputAdapter.TryGetMemberEndForcesFromOutput(
+                            outputObj,
                             beamNo,
                             1,
                             loadCase,

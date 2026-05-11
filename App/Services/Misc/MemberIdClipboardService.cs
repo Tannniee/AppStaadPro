@@ -2,32 +2,29 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Windows.Forms;
 
 namespace StaadSteelApp.Core.Misc
 {
     internal static class MemberIdClipboardService
     {
-        internal static void CopySelectedMemberIds()
+        internal static ServiceOperationResult CopySelectedMemberIds(out string clipboardText)
         {
+            clipboardText = string.Empty;
             if (!MiscSelectionService.TryGetSelectedBeamIds(out int[] beamIds, out string selectionError))
             {
                 string message = string.IsNullOrWhiteSpace(selectionError)
                     ? "Could not read STAAD selection."
                     : selectionError;
-                TopMostMessageBox.ShowInfo(message, "ID MEMBER");
-                return;
+                return ServiceOperationResult.Info("ID MEMBER", message);
             }
 
             if (beamIds == null || beamIds.Length == 0)
             {
-                TopMostMessageBox.ShowInfo("Please select beams in STAAD.", "ID MEMBER");
-                return;
+                return ServiceOperationResult.Info("ID MEMBER", "Please select beams in STAAD.");
             }
 
-            string text = FormatMemberIdRanges(beamIds);
-            Clipboard.SetText(text);
-            TopMostMessageBox.ShowSuccess($"Copied {beamIds.Distinct().Count()} member IDs.", "ID MEMBER");
+            clipboardText = FormatMemberIdRanges(beamIds);
+            return ServiceOperationResult.Success("ID MEMBER", $"Copied {beamIds.Distinct().Count()} member IDs.");
         }
 
         internal static string FormatMemberIdRanges(IEnumerable<int> memberIds)

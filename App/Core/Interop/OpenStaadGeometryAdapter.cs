@@ -3,8 +3,10 @@ using System.Collections.Generic;
 
 namespace StaadSteelApp.Core.Interop
 {
-    internal static class OpenStaadGeometryAdapter
+    internal static partial class OpenStaadGeometryAdapter
     {
+        private const int SingleSelectionFallbackLimit = 200;
+
         internal static bool TryGetBeamLength(object openStaad, int beamId, out double length, out string error)
         {
             length = 0.0;
@@ -247,55 +249,6 @@ namespace StaadSteelApp.Core.Interop
             return true;
         }
 
-        internal static bool TryGetGroupNames(object openStaad, int groupType, out string[] names, out string error)
-        {
-            names = Array.Empty<string>();
-            error = string.Empty;
-
-            if (!OpenStaadAdapterHelpers.TryGetSubObject(openStaad, "Geometry", out object geometry, out error))
-                return false;
-
-            if (!ComInvoke.TryInvoke(geometry, "GetGroupCount", out object countRaw, out error, new object[] { groupType }))
-                return false;
-
-            int count = ComResult.ToInt32(countRaw);
-            if (count <= 0)
-                return true;
-
-            object[] args = new object[] { groupType, new string[count] };
-            if (!ComInvoke.TryInvoke(geometry, "GetGroupNames", out _, out error, args, ComInvoke.ByRefModifiers(2, 1)))
-                return false;
-
-            names = NormalizeStrings(args[1] as Array);
-            return true;
-        }
-
-        internal static bool TryGetGroupEntities(object openStaad, string groupName, out int[] entities, out string error)
-        {
-            entities = Array.Empty<int>();
-            error = string.Empty;
-
-            if (string.IsNullOrWhiteSpace(groupName))
-                return true;
-
-            if (!OpenStaadAdapterHelpers.TryGetSubObject(openStaad, "Geometry", out object geometry, out error))
-                return false;
-
-            if (!ComInvoke.TryInvoke(geometry, "GetGroupEntityCount", out object countRaw, out error, new object[] { groupName }))
-                return false;
-
-            int count = ComResult.ToInt32(countRaw);
-            if (count <= 0)
-                return true;
-
-            object[] args = new object[] { groupName, new int[count] };
-            if (!ComInvoke.TryInvoke(geometry, "GetGroupEntities", out _, out error, args, ComInvoke.ByRefModifiers(2, 1)))
-                return false;
-
-            entities = NormalizePositiveIds(ComResult.ToIntArray(args[1]));
-            return true;
-        }
-
         internal static bool TryClearMemberSelection(object geometry, out string error)
         {
             return TryClearSelection(geometry, "ClearMemberSelection", out error);
@@ -355,18 +308,34 @@ namespace StaadSteelApp.Core.Interop
                 return false;
             }
 
-            if (ComInvoke.TryInvoke(geometry, multipleMethodName, out object result, out string multipleError, new object[] { ids }) &&
-                (result == null || ComResult.IsZeroOrTrue(result)))
+            if (TrySelectManyDynamic(geometry, multipleMethodName, ids, out object result, out string dynamicError) &&
+                IsSelectionSuccess(result))
             {
                 return true;
             }
 
+            if (ComInvoke.TryInvoke(geometry, multipleMethodName, out result, out string multipleError, new object[] { ids }) &&
+                IsSelectionSuccess(result))
+            {
+                return true;
+            }
+
+            if (ids.Length > SingleSelectionFallbackLimit)
+            {
+                error = !string.IsNullOrWhiteSpace(multipleError)
+                    ? multipleError
+                    : (!string.IsNullOrWhiteSpace(dynamicError)
+                        ? dynamicError
+                        : $"STAAD bulk selection failed for {ids.Length} items.");
+                return false;
+            }
+
             int success = 0;
-            string lastError = multipleError ?? string.Empty;
+            string lastError = !string.IsNullOrWhiteSpace(multipleError) ? multipleError : (dynamicError ?? string.Empty);
             foreach (int id in ids)
             {
                 if (ComInvoke.TryInvoke(geometry, singleMethodName, out result, out string singleError, new object[] { id }) &&
-                    (result == null || ComResult.IsZeroOrTrue(result)))
+                    IsSelectionSuccess(result))
                 {
                     success++;
                     continue;
@@ -385,6 +354,38 @@ namespace StaadSteelApp.Core.Interop
             return false;
         }
 
+        private static bool TrySelectManyDynamic(object geometry, string multipleMethodName, int[] ids, out object result, out string error)
+        {
+            result = null;
+            error = string.Empty;
+            if (geometry == null || ids == null || ids.Length == 0)
+                return false;
+
+            try
+            {
+                dynamic dynGeometry = geometry;
+
+                if (string.Equals(multipleMethodName, "SelectMultipleBeams", StringComparison.Ordinal))
+                    result = dynGeometry.SelectMultipleBeams(ids);
+                else if (string.Equals(multipleMethodName, "SelectMultipleNodes", StringComparison.Ordinal))
+                    result = dynGeometry.SelectMultipleNodes(ids);
+                else
+                    return false;
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        private static bool IsSelectionSuccess(object result)
+        {
+            return result == null || ComResult.IsTrue(result);
+        }
+
         private static int[] NormalizePositiveIds(IReadOnlyList<int> ids)
         {
             if (ids == null || ids.Count == 0)
@@ -396,22 +397,6 @@ namespace StaadSteelApp.Core.Interop
             {
                 if (id > 0 && seen.Add(id))
                     result.Add(id);
-            }
-
-            return result.ToArray();
-        }
-
-        private static string[] NormalizeStrings(Array values)
-        {
-            if (values == null || values.Length == 0)
-                return Array.Empty<string>();
-
-            var result = new List<string>(values.Length);
-            foreach (object value in values)
-            {
-                string text = Convert.ToString(value);
-                if (!string.IsNullOrWhiteSpace(text))
-                    result.Add(text.Trim());
             }
 
             return result.ToArray();

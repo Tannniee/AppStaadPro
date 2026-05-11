@@ -37,9 +37,9 @@ namespace StaadSteelApp.Core
                         _mainForm.BeginInvoke((Action)(() => _mainForm.ResetWindowToCenter()));
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore shutdown races.
+                    AppLogger.Exception("Reset-position listener failed while dispatching to MainForm.", ex);
                 }
             }
         }
@@ -57,8 +57,9 @@ namespace StaadSteelApp.Core
             {
                 _resetEvent.Set();
             }
-            catch
+            catch (Exception ex)
             {
+                AppLogger.Exception("Reset-position listener failed while signaling shutdown.", ex);
             }
 
             try
@@ -68,8 +69,9 @@ namespace StaadSteelApp.Core
                     _listenerThread.Interrupt();
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppLogger.Exception("Reset-position listener failed while stopping the background thread.", ex);
             }
         }
     }

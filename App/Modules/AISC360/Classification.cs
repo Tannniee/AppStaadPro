@@ -309,8 +309,7 @@ namespace StaadSteelApp.AISC360
             double Qs = 1.0;
             double Qa = 1.0;
 
-            // A. Round HSS (Pipe) - E7.2 (technically E7 members with slender elements)
-            // Actually Pipe uses Qa per User Note or specific section ??
+            // Round HSS (pipe) uses Qa per E7.2(c).
             // E7.2 (c) Round HSS: Q = Q_a. 
             // Equation E7-19: Q = Q_a = (0.038 E)/(Fy(D/t)) + 2/3
             if (input.IsPipe)
@@ -333,10 +332,8 @@ namespace StaadSteelApp.AISC360
                 }
                 else if (D_t >= limit_upper)
                 {
-                     // Exceeds validity range ?? usually not allowed but Q=...
-                     // AISC doesn't specify > 0.45 E/Fy in E7. it says "members with D/t exceeding 0.45 E/Fy should not be used in compression"
-                     // We clamp Q to something small or just strictly apply formula?
-                     // Let's apply formula but warn? For now apply formula.
+                     // E7.2 identifies members above 0.45E/Fy as unsuitable for compression.
+                     // Keep the formula value so the caller can report the governing warning.
                      Qa = (0.038 * E) / (Fy * D_t) + 2.0/3.0; 
                 }
                 

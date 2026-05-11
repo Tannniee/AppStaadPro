@@ -1,4 +1,4 @@
-namespace StaadSteelApp
+﻿namespace StaadSteelApp
 {
     partial class MainForm
     {
@@ -33,6 +33,7 @@ namespace StaadSteelApp
             this.btnRun = new System.Windows.Forms.Button();
             this.btnAdvance = new System.Windows.Forms.Button();
             this.btnAssignLoad = new System.Windows.Forms.Button();
+            this.btnGroups = new System.Windows.Forms.Button();
             this.chkUPT = new System.Windows.Forms.CheckBox();
             this.chkUsedSections = new System.Windows.Forms.CheckBox();
             this.cboSeries = new System.Windows.Forms.ComboBox();
@@ -66,9 +67,9 @@ namespace StaadSteelApp
             this.grpDimensions.SuspendLayout();
             this.grpUsedSections.SuspendLayout();
             this.SuspendLayout();
-            // 
+            //
             // btnDetect
-            // 
+            //
             this.btnDetect.BackColor = System.Drawing.Color.LightBlue;
             this.btnDetect.Location = new System.Drawing.Point(15, 12);
             this.btnDetect.Name = "btnDetect";
@@ -77,9 +78,9 @@ namespace StaadSteelApp
             this.btnDetect.Text = "Detect Active";
             this.btnDetect.UseVisualStyleBackColor = false;
             this.btnDetect.Click += new System.EventHandler(this.btnDetect_Click);
-            // 
+            //
             // btnDetectAll
-            // 
+            //
             this.btnDetectAll.BackColor = System.Drawing.Color.LightPink;
             this.btnDetectAll.Location = new System.Drawing.Point(106, 12);
             this.btnDetectAll.Name = "btnDetectAll";
@@ -88,59 +89,59 @@ namespace StaadSteelApp
             this.btnDetectAll.Text = "Detect All";
             this.btnDetectAll.UseVisualStyleBackColor = false;
             this.btnDetectAll.Click += new System.EventHandler(this.btnDetectAll_Click);
-            // 
+            //
             // lblCode
-            // 
+            //
             this.lblCode.AutoSize = true;
             this.lblCode.Location = new System.Drawing.Point(18, 61);
             this.lblCode.Name = "lblCode";
             this.lblCode.Size = new System.Drawing.Size(32, 13);
             this.lblCode.TabIndex = 16;
             this.lblCode.Text = "Code";
-            // 
+            //
             // txtCode
-            // 
+            //
             this.txtCode.Location = new System.Drawing.Point(63, 58);
             this.txtCode.Name = "txtCode";
             this.txtCode.Size = new System.Drawing.Size(128, 20);
             this.txtCode.TabIndex = 1;
-            // 
+            //
             // txtName
-            // 
+            //
             this.txtName.Location = new System.Drawing.Point(63, 84);
             this.txtName.Name = "txtName";
             this.txtName.Size = new System.Drawing.Size(128, 20);
             this.txtName.TabIndex = 2;
-            // 
+            //
             // lblName
-            // 
+            //
             this.lblName.AutoSize = true;
             this.lblName.Location = new System.Drawing.Point(18, 87);
             this.lblName.Name = "lblName";
             this.lblName.Size = new System.Drawing.Size(35, 13);
             this.lblName.TabIndex = 15;
             this.lblName.Text = "Name";
-            // 
+            //
             // cboMaterial
-            // 
+            //
             this.cboMaterial.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cboMaterial.FormattingEnabled = true;
             this.cboMaterial.Location = new System.Drawing.Point(63, 399);
             this.cboMaterial.Name = "cboMaterial";
             this.cboMaterial.Size = new System.Drawing.Size(128, 21);
             this.cboMaterial.TabIndex = 7;
-            // 
+            //
             // lblMat
-            // 
+            //
             this.lblMat.AutoSize = true;
             this.lblMat.Location = new System.Drawing.Point(18, 402);
             this.lblMat.Name = "lblMat";
             this.lblMat.Size = new System.Drawing.Size(44, 13);
             this.lblMat.TabIndex = 14;
             this.lblMat.Text = "Material";
-            // 
+            //
             // btnApplySel
-            // 
+            //
             this.btnApplySel.BackColor = System.Drawing.Color.White;
             this.btnApplySel.Location = new System.Drawing.Point(106, 426);
             this.btnApplySel.Name = "btnApplySel";
@@ -149,9 +150,9 @@ namespace StaadSteelApp
             this.btnApplySel.Text = "Selected";
             this.btnApplySel.UseVisualStyleBackColor = false;
             this.btnApplySel.Click += new System.EventHandler(this.btnApplySel_Click);
-            // 
+            //
             // grpCopyPaste
-            // 
+            //
             this.grpCopyPaste.Controls.Add(this.txtCopied);
             this.grpCopyPaste.Controls.Add(this.btnCopy);
             this.grpCopyPaste.Controls.Add(this.btnPaste);
@@ -161,9 +162,9 @@ namespace StaadSteelApp
             this.grpCopyPaste.TabIndex = 10;
             this.grpCopyPaste.TabStop = false;
             this.grpCopyPaste.Text = "Copy / Paste Section";
-            // 
+            //
             // txtCopied
-            // 
+            //
             this.txtCopied.BackColor = System.Drawing.Color.WhiteSmoke;
             this.txtCopied.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.txtCopied.ForeColor = System.Drawing.Color.Red;
@@ -174,27 +175,27 @@ namespace StaadSteelApp
             this.txtCopied.TabIndex = 0;
             this.txtCopied.Text = "(No section copied)";
             this.txtCopied.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
-            // 
+            //
             // btnCopy
-            // 
+            //
             this.btnCopy.Location = new System.Drawing.Point(10, 50);
             this.btnCopy.Name = "btnCopy";
             this.btnCopy.Size = new System.Drawing.Size(75, 30);
             this.btnCopy.TabIndex = 1;
             this.btnCopy.Text = "Copy";
             this.btnCopy.Click += new System.EventHandler(this.btnCopy_Click);
-            // 
+            //
             // btnPaste
-            // 
+            //
             this.btnPaste.Location = new System.Drawing.Point(91, 50);
             this.btnPaste.Name = "btnPaste";
             this.btnPaste.Size = new System.Drawing.Size(75, 30);
             this.btnPaste.TabIndex = 2;
             this.btnPaste.Text = "Paste";
             this.btnPaste.Click += new System.EventHandler(this.btnPaste_Click);
-            // 
+            //
             // cboType
-            // 
+            //
             this.cboType.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cboType.FormattingEnabled = true;
             this.cboType.Items.AddRange(new object[] {
@@ -210,9 +211,9 @@ namespace StaadSteelApp
             this.cboType.Name = "cboType";
             this.cboType.Size = new System.Drawing.Size(128, 21);
             this.cboType.TabIndex = 3;
-            // 
+            //
             // btnApplyAll
-            // 
+            //
             this.btnApplyAll.BackColor = System.Drawing.Color.White;
             this.btnApplyAll.Location = new System.Drawing.Point(15, 426);
             this.btnApplyAll.Name = "btnApplyAll";
@@ -221,9 +222,9 @@ namespace StaadSteelApp
             this.btnApplyAll.Text = "All";
             this.btnApplyAll.UseVisualStyleBackColor = false;
             this.btnApplyAll.Click += new System.EventHandler(this.btnApplyAll_Click);
-            // 
+            //
             // btnClean
-            // 
+            //
             this.btnClean.Location = new System.Drawing.Point(106, 558);
             this.btnClean.Name = "btnClean";
             this.btnClean.Size = new System.Drawing.Size(85, 30);
@@ -231,9 +232,9 @@ namespace StaadSteelApp
             this.btnClean.Text = "Export";
             this.btnClean.UseVisualStyleBackColor = true;
             this.btnClean.Click += new System.EventHandler(this.btnClean_Click);
-            // 
+            //
             // btnMisc
-            // 
+            //
             this.btnMisc.Location = new System.Drawing.Point(15, 558);
             this.btnMisc.Name = "btnMisc";
             this.btnMisc.Size = new System.Drawing.Size(85, 30);
@@ -241,9 +242,9 @@ namespace StaadSteelApp
             this.btnMisc.Text = "Misc Tools";
             this.btnMisc.UseVisualStyleBackColor = true;
             this.btnMisc.Click += new System.EventHandler(this.btnMisc_Click);
-            // 
+            //
             // btnFindReplace
-            // 
+            //
             this.btnFindReplace.Location = new System.Drawing.Point(15, 594);
             this.btnFindReplace.Name = "btnFindReplace";
             this.btnFindReplace.Size = new System.Drawing.Size(85, 30);
@@ -251,9 +252,9 @@ namespace StaadSteelApp
             this.btnFindReplace.Text = "Check";
             this.btnFindReplace.UseVisualStyleBackColor = true;
             this.btnFindReplace.Click += new System.EventHandler(this.btnFindReplace_Click);
-            // 
+            //
             // btnRun
-            // 
+            //
             this.btnRun.Location = new System.Drawing.Point(106, 594);
             this.btnRun.Name = "btnRun";
             this.btnRun.Size = new System.Drawing.Size(85, 30);
@@ -261,9 +262,9 @@ namespace StaadSteelApp
             this.btnRun.Text = "RUN";
             this.btnRun.UseVisualStyleBackColor = true;
             this.btnRun.Click += new System.EventHandler(this.btnRun_Click);
-            // 
+            //
             // btnAdvance
-            // 
+            //
             this.btnAdvance.Location = new System.Drawing.Point(106, 628);
             this.btnAdvance.Name = "btnAdvance";
             this.btnAdvance.Size = new System.Drawing.Size(85, 30);
@@ -271,9 +272,9 @@ namespace StaadSteelApp
             this.btnAdvance.Text = "Advance";
             this.btnAdvance.UseVisualStyleBackColor = true;
             this.btnAdvance.Click += new System.EventHandler(this.btnAdvance_Click);
-            // 
+            //
             // btnAssignLoad
-            // 
+            //
             this.btnAssignLoad.Location = new System.Drawing.Point(15, 628);
             this.btnAssignLoad.Name = "btnAssignLoad";
             this.btnAssignLoad.Size = new System.Drawing.Size(85, 30);
@@ -281,9 +282,19 @@ namespace StaadSteelApp
             this.btnAssignLoad.Text = "ASSIGN load";
             this.btnAssignLoad.UseVisualStyleBackColor = true;
             this.btnAssignLoad.Click += new System.EventHandler(this.btnAssignLoad_Click);
-            // 
+            //
+            // btnGroups
+            //
+            this.btnGroups.Location = new System.Drawing.Point(15, 662);
+            this.btnGroups.Name = "btnGroups";
+            this.btnGroups.Size = new System.Drawing.Size(176, 30);
+            this.btnGroups.TabIndex = 20;
+            this.btnGroups.Text = "Group";
+            this.btnGroups.UseVisualStyleBackColor = true;
+            this.btnGroups.Click += new System.EventHandler(this.btnGroups_Click);
+            //
             // chkUPT
-            // 
+            //
             this.chkUPT.AutoSize = true;
             this.chkUPT.Location = new System.Drawing.Point(21, 137);
             this.chkUPT.Name = "chkUPT";
@@ -292,9 +303,9 @@ namespace StaadSteelApp
             this.chkUPT.Text = "Create as UPT";
             this.chkUPT.UseVisualStyleBackColor = true;
             this.chkUPT.CheckedChanged += new System.EventHandler(this.chkUPT_CheckedChanged);
-            // 
+            //
             // chkUsedSections
-            // 
+            //
             this.chkUsedSections.AutoSize = true;
             this.chkUsedSections.Location = new System.Drawing.Point(123, 137);
             this.chkUsedSections.Name = "chkUsedSections";
@@ -303,9 +314,9 @@ namespace StaadSteelApp
             this.chkUsedSections.Text = "Used";
             this.chkUsedSections.UseVisualStyleBackColor = true;
             this.chkUsedSections.CheckedChanged += new System.EventHandler(this.chkUsedSections_CheckedChanged);
-            // 
+            //
             // cboSeries
-            // 
+            //
             this.cboSeries.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cboSeries.FormattingEnabled = true;
             this.cboSeries.Location = new System.Drawing.Point(55, 80);
@@ -313,9 +324,9 @@ namespace StaadSteelApp
             this.cboSeries.Size = new System.Drawing.Size(110, 21);
             this.cboSeries.TabIndex = 27;
             this.cboSeries.Visible = false;
-            // 
+            //
             // lblSeries
-            // 
+            //
             this.lblSeries.AutoSize = true;
             this.lblSeries.Location = new System.Drawing.Point(10, 83);
             this.lblSeries.Name = "lblSeries";
@@ -323,9 +334,9 @@ namespace StaadSteelApp
             this.lblSeries.TabIndex = 26;
             this.lblSeries.Text = "Series";
             this.lblSeries.Visible = false;
-            // 
+            //
             // cboSection
-            // 
+            //
             this.cboSection.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cboSection.FormattingEnabled = true;
             this.cboSection.Location = new System.Drawing.Point(55, 110);
@@ -333,9 +344,9 @@ namespace StaadSteelApp
             this.cboSection.Size = new System.Drawing.Size(110, 21);
             this.cboSection.TabIndex = 25;
             this.cboSection.Visible = false;
-            // 
+            //
             // lblSection
-            // 
+            //
             this.lblSection.AutoSize = true;
             this.lblSection.Location = new System.Drawing.Point(10, 113);
             this.lblSection.Name = "lblSection";
@@ -343,9 +354,9 @@ namespace StaadSteelApp
             this.lblSection.TabIndex = 24;
             this.lblSection.Text = "Section";
             this.lblSection.Visible = false;
-            // 
+            //
             // cboShape
-            // 
+            //
             this.cboShape.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cboShape.FormattingEnabled = true;
             this.cboShape.Location = new System.Drawing.Point(55, 50);
@@ -353,9 +364,9 @@ namespace StaadSteelApp
             this.cboShape.Size = new System.Drawing.Size(110, 21);
             this.cboShape.TabIndex = 23;
             this.cboShape.Visible = false;
-            // 
+            //
             // lblShape
-            // 
+            //
             this.lblShape.AutoSize = true;
             this.lblShape.Location = new System.Drawing.Point(10, 53);
             this.lblShape.Name = "lblShape";
@@ -363,9 +374,9 @@ namespace StaadSteelApp
             this.lblShape.TabIndex = 22;
             this.lblShape.Text = "Shape";
             this.lblShape.Visible = false;
-            // 
+            //
             // cboZone
-            // 
+            //
             this.cboZone.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cboZone.FormattingEnabled = true;
             this.cboZone.Location = new System.Drawing.Point(55, 20);
@@ -373,9 +384,9 @@ namespace StaadSteelApp
             this.cboZone.Size = new System.Drawing.Size(110, 21);
             this.cboZone.TabIndex = 21;
             this.cboZone.Visible = false;
-            // 
+            //
             // lblZone
-            // 
+            //
             this.lblZone.AutoSize = true;
             this.lblZone.Location = new System.Drawing.Point(10, 23);
             this.lblZone.Name = "lblZone";
@@ -383,137 +394,137 @@ namespace StaadSteelApp
             this.lblZone.TabIndex = 20;
             this.lblZone.Text = "Zone";
             this.lblZone.Visible = false;
-            // 
+            //
             // lblH1
-            // 
+            //
             this.lblH1.AutoSize = true;
             this.lblH1.Location = new System.Drawing.Point(10, 23);
             this.lblH1.Name = "lblH1";
             this.lblH1.Size = new System.Drawing.Size(21, 13);
             this.lblH1.TabIndex = 0;
             this.lblH1.Text = "H1";
-            // 
+            //
             // txtH1
-            // 
+            //
             this.txtH1.Location = new System.Drawing.Point(70, 20);
             this.txtH1.Name = "txtH1";
             this.txtH1.Size = new System.Drawing.Size(95, 20);
             this.txtH1.TabIndex = 1;
-            // 
+            //
             // lblH2
-            // 
+            //
             this.lblH2.AutoSize = true;
             this.lblH2.Location = new System.Drawing.Point(10, 49);
             this.lblH2.Name = "lblH2";
             this.lblH2.Size = new System.Drawing.Size(21, 13);
             this.lblH2.TabIndex = 2;
             this.lblH2.Text = "H2";
-            // 
+            //
             // txtH2
-            // 
+            //
             this.txtH2.Location = new System.Drawing.Point(70, 46);
             this.txtH2.Name = "txtH2";
             this.txtH2.Size = new System.Drawing.Size(95, 20);
             this.txtH2.TabIndex = 3;
-            // 
+            //
             // lblTw
-            // 
+            //
             this.lblTw.AutoSize = true;
             this.lblTw.Location = new System.Drawing.Point(10, 75);
             this.lblTw.Name = "lblTw";
             this.lblTw.Size = new System.Drawing.Size(22, 13);
             this.lblTw.TabIndex = 4;
             this.lblTw.Text = "Tw";
-            // 
+            //
             // txtTw
-            // 
+            //
             this.txtTw.Location = new System.Drawing.Point(70, 72);
             this.txtTw.Name = "txtTw";
             this.txtTw.Size = new System.Drawing.Size(95, 20);
             this.txtTw.TabIndex = 5;
-            // 
+            //
             // lblBf
-            // 
+            //
             this.lblBf.AutoSize = true;
             this.lblBf.Location = new System.Drawing.Point(10, 101);
             this.lblBf.Name = "lblBf";
             this.lblBf.Size = new System.Drawing.Size(17, 13);
             this.lblBf.TabIndex = 6;
             this.lblBf.Text = "Bf";
-            // 
+            //
             // txtBf
-            // 
+            //
             this.txtBf.Location = new System.Drawing.Point(70, 98);
             this.txtBf.Name = "txtBf";
             this.txtBf.Size = new System.Drawing.Size(95, 20);
             this.txtBf.TabIndex = 7;
-            // 
+            //
             // lblTf
-            // 
+            //
             this.lblTf.AutoSize = true;
             this.lblTf.Location = new System.Drawing.Point(10, 127);
             this.lblTf.Name = "lblTf";
             this.lblTf.Size = new System.Drawing.Size(17, 13);
             this.lblTf.TabIndex = 8;
             this.lblTf.Text = "Tf";
-            // 
+            //
             // txtTf
-            // 
+            //
             this.txtTf.Location = new System.Drawing.Point(70, 124);
             this.txtTf.Name = "txtTf";
             this.txtTf.Size = new System.Drawing.Size(95, 20);
             this.txtTf.TabIndex = 9;
-            // 
+            //
             // lblBfb
-            // 
+            //
             this.lblBfb.AutoSize = true;
             this.lblBfb.Location = new System.Drawing.Point(10, 153);
             this.lblBfb.Name = "lblBfb";
             this.lblBfb.Size = new System.Drawing.Size(23, 13);
             this.lblBfb.TabIndex = 10;
             this.lblBfb.Text = "Bfb";
-            // 
+            //
             // txtBfb
-            // 
+            //
             this.txtBfb.Location = new System.Drawing.Point(70, 150);
             this.txtBfb.Name = "txtBfb";
             this.txtBfb.Size = new System.Drawing.Size(95, 20);
             this.txtBfb.TabIndex = 11;
-            // 
+            //
             // lblTfb
-            // 
+            //
             this.lblTfb.AutoSize = true;
             this.lblTfb.Location = new System.Drawing.Point(10, 179);
             this.lblTfb.Name = "lblTfb";
             this.lblTfb.Size = new System.Drawing.Size(23, 13);
             this.lblTfb.TabIndex = 12;
             this.lblTfb.Text = "Tfb";
-            // 
+            //
             // txtTfb
-            // 
+            //
             this.txtTfb.Location = new System.Drawing.Point(70, 176);
             this.txtTfb.Name = "txtTfb";
             this.txtTfb.Size = new System.Drawing.Size(95, 20);
             this.txtTfb.TabIndex = 13;
-            // 
+            //
             // lblDis
-            // 
+            //
             this.lblDis.AutoSize = true;
             this.lblDis.Location = new System.Drawing.Point(10, 205);
             this.lblDis.Name = "lblDis";
             this.lblDis.Size = new System.Drawing.Size(47, 13);
             this.lblDis.TabIndex = 14;
             this.lblDis.Text = "Gap/Dis";
-            // 
+            //
             // txtDis
-            // 
+            //
             this.txtDis.Location = new System.Drawing.Point(70, 202);
             this.txtDis.Name = "txtDis";
             this.txtDis.Size = new System.Drawing.Size(95, 20);
             this.txtDis.TabIndex = 15;
-            // 
+            //
             // grpDimensions
-            // 
+            //
             this.grpDimensions.Controls.Add(this.txtDis);
             this.grpDimensions.Controls.Add(this.lblDis);
             this.grpDimensions.Controls.Add(this.txtTfb);
@@ -545,9 +556,9 @@ namespace StaadSteelApp
             this.grpDimensions.TabStop = false;
             this.grpDimensions.Text = "Dimensions";
             this.grpDimensions.Enter += new System.EventHandler(this.grpDimensions_Enter);
-            // 
+            //
             // grpUsedSections
-            // 
+            //
             this.grpUsedSections.Controls.Add(this.lstUsedSections);
             this.grpUsedSections.Location = new System.Drawing.Point(21, 160);
             this.grpUsedSections.Name = "grpUsedSections";
@@ -556,9 +567,9 @@ namespace StaadSteelApp
             this.grpUsedSections.TabStop = false;
             this.grpUsedSections.Text = "Used Sections";
             this.grpUsedSections.Visible = false;
-            // 
+            //
             // lstUsedSections
-            // 
+            //
             this.lstUsedSections.FormattingEnabled = true;
             this.lstUsedSections.HorizontalScrollbar = true;
             this.lstUsedSections.IntegralHeight = false;
@@ -566,10 +577,10 @@ namespace StaadSteelApp
             this.lstUsedSections.Name = "lstUsedSections";
             this.lstUsedSections.Size = new System.Drawing.Size(156, 202);
             this.lstUsedSections.TabIndex = 0;
-            // 
+            //
             // MainForm
-            // 
-            this.ClientSize = new System.Drawing.Size(203, 668);
+            //
+            this.ClientSize = new System.Drawing.Size(203, 702);
             this.Controls.Add(this.grpUsedSections);
             this.Controls.Add(this.chkUsedSections);
             this.Controls.Add(this.chkUPT);
@@ -592,6 +603,7 @@ namespace StaadSteelApp
             this.Controls.Add(this.btnRun);
             this.Controls.Add(this.btnAdvance);
             this.Controls.Add(this.btnAssignLoad);
+            this.Controls.Add(this.btnGroups);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
             this.Name = "MainForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
@@ -627,6 +639,7 @@ namespace StaadSteelApp
         private System.Windows.Forms.Button btnRun;
         private System.Windows.Forms.Button btnAdvance;
         private System.Windows.Forms.Button btnAssignLoad;
+        private System.Windows.Forms.Button btnGroups;
         private System.Windows.Forms.Button btnDetectAll;
         private System.Windows.Forms.CheckBox chkUPT;
         private System.Windows.Forms.CheckBox chkUsedSections;
@@ -660,5 +673,4 @@ namespace StaadSteelApp
     }
 
 }
-
 

@@ -9,6 +9,25 @@ namespace StaadSteelApp
     {
         private bool _isRefreshingUsedSections;
 
+        private void InitializeUsedSectionsHighlightTimer()
+        {
+            if (_usedSectionsHighlightTimer != null)
+                return;
+
+            _usedSectionsHighlightTimer = new Timer { Interval = 120 };
+            _usedSectionsHighlightTimer.Tick += UsedSectionsHighlightTimer_Tick;
+        }
+
+        private void DisposeUsedSectionsHighlightTimer()
+        {
+            if (_usedSectionsHighlightTimer == null)
+                return;
+
+            _usedSectionsHighlightTimer.Stop();
+            _usedSectionsHighlightTimer.Dispose();
+            _usedSectionsHighlightTimer = null;
+        }
+
         private void chkUsedSections_CheckedChanged(object sender, EventArgs e)
         {
             if (chkUsedSections.Checked)
@@ -82,25 +101,62 @@ namespace StaadSteelApp
             _usedSectionsHighlightTimer?.Start();
         }
 
+        private void UsedSectionsHighlightTimer_Tick(object sender, EventArgs e)
+        {
+            _usedSectionsHighlightTimer?.Stop();
+
+            int[] beamIds = _pendingUsedSectionBeamIds;
+            int[] propertyIds = _pendingUsedSectionPropertyIds;
+            _pendingUsedSectionBeamIds = null;
+            _pendingUsedSectionPropertyIds = null;
+            if ((beamIds == null || beamIds.Length == 0) &&
+                (propertyIds == null || propertyIds.Length == 0))
+                return;
+
+            if (_isRefreshingUsedSections || _usedSectionsForm == null || _usedSectionsForm.IsDisposed)
+                return;
+
+            if (!TryGetMainOpenStaad(out object openStaad)) return;
+
+            if (beamIds != null && beamIds.Length > 0)
+            {
+                if (SectionService.HighlightBeamIds(openStaad, beamIds, out string beamError))
+                    return;
+
+                if (propertyIds == null || propertyIds.Length == 0)
+                {
+                    TopMostMessageBox.ShowWarning(beamError, "Used Sections");
+                    return;
+                }
+            }
+
+            if (propertyIds != null && propertyIds.Length > 0)
+            {
+                string propertyError;
+                if (!SectionService.HighlightUsedSections(openStaad, propertyIds, out propertyError))
+                {
+                    TopMostMessageBox.ShowWarning(propertyError, "Used Sections");
+                }
+            }
+        }
+
         private void PopulateUiFromUsedSection(UsedSectionEntry entry)
         {
             if (entry == null || entry.PropertyId <= 0)
                 return;
 
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-                return;
+            if (!TryGetMainOpenStaad(out object openStaad)) return;
 
             try
             {
-                var info = SectionService.DetectSectionByPropertyId(os, entry.PropertyId);
+                var info = SectionService.DetectSectionByPropertyId(openStaad, entry.PropertyId);
                 if (info == null)
                     return;
 
                 _isPopulating = true;
                 try
                 {
-                    SetSectionInfoToUI(info, os);
+                    SetSectionInfoToUI(info, openStaad);
                 }
                 finally
                 {
@@ -151,16 +207,14 @@ namespace StaadSteelApp
             if (_usedSectionsForm == null || _usedSectionsForm.IsDisposed)
                 return;
 
-            var os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-                return;
+            if (!TryGetMainOpenStaad(out object openStaad)) return;
 
             int[] selectedPropertyIds = _usedSectionsForm.SelectedPropertyIds;
 
             _isRefreshingUsedSections = true;
             try
             {
-                var items = SectionService.GetUsedSections(os);
+                var items = SectionService.GetUsedSections(openStaad);
                 _usedSectionsForm.SetEntries(items, selectedPropertyIds, selectedPropertyId);
             }
             catch (Exception ex)

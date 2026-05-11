@@ -6,10 +6,10 @@ namespace StaadSteelApp.Core
     internal static class SectionPropertyCreateModule
     {
         internal static int GetOrCreateProperty(
-            dynamic os,
+            object os,
             SectionInfo info,
-            Func<dynamic, SectionInfo, int> getOrCreateUPTSection,
-            Func<dynamic, string, int> checkPropertyExists)
+            Func<object, SectionInfo, int> getOrCreateUPTSection,
+            Func<object, string, int> checkPropertyExists)
         {
             // 0. UPT Handling
             if (info.CreateAsUPT)
@@ -17,7 +17,8 @@ namespace StaadSteelApp.Core
                 return getOrCreateUPTSection(os, info);
             }
 
-            object propertyObj = os.Property;
+            if (!OpenStaadPropertyAdapter.TryGetPropertyObject(os, out object propertyObj, out string propertyError))
+                throw new SectionPropertyException(propertyError);
 
             // 1. Tapered I
             if (info.PropType == eFramePropType.I)

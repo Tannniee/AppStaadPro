@@ -160,22 +160,16 @@ namespace StaadSteelApp.AISC360
                      return num / den;
                  }
 
-                 // Eq H3-6: (Pr/Pc + Mr/Mc) + (Vr/Vc + Tr/Tc)^2 <= 1.0
-                 // Note: Pr/Pc + Mr/Mc is essentially the result of H1-1a/b calculated previously
-                 // But we need to recalculate or reuse.
-                 
-                 // Get Demand/Capacity ratios
+                 // Eq H3-6: (Pr/Pc + Mr/Mc) + (Vr/Vc + Tr/Tc)^2 <= 1.0.
+                 // Use direct component ratios rather than the H1 interaction result.
+
                  double ratio_axial = SafeRatio(axialCheck?.Demand ?? 0.0, axialCheck?.Capacity ?? 0.0);
                  double ratio_flex = SafeRatio(flexureMajor?.Demand ?? 0.0, flexureMajor?.Capacity ?? 0.0) +
                                      SafeRatio(flexureMinor?.Demand ?? 0.0, flexureMinor?.Capacity ?? 0.0);
                  
-                 // Result from H1-1a/b is effectively the interaction of P+M
-                 // BUT H3-6 uses direct sum: Pr/Pc + Mrx/Mcx + Mry/Mcy
                  double ratio_PM_interaction = ratio_axial + ratio_flex;
 
-                 // Calculate Max Shear Ratio (Vector sum or max individual)
-                 // HSS usually check max of V+T interaction on faces
-                 // Simplified H3-6 approach:
+                 // Use the larger shear demand component for the V/T interaction term.
                  
                  double Vr = Math.Max(Math.Abs(input.Vrx), Math.Abs(input.Vry)) / 1000.0; // N -> kN
                  double Vc = Math.Max((shearMajor?.Capacity ?? 0.0), (shearMinor?.Capacity ?? 0.0));
@@ -226,21 +220,10 @@ namespace StaadSteelApp.AISC360
 
             if (input.IsPipe)
             {
-                // H3.1 Round HSS: Tn = Fcr * C
-                // C (Torsional Constant) -> J for Round HSS is Polar MOI ~ 2*Ix. 
-                // However, C for stress calculation in H3.1 is defined as J? No, C is HSS Torsional Constant.
-                // For Round HSS, C = (Pi(D-t)^2 * t) / 2 ?? No, use the available J value (input.J) or the standard calc.
-                // Actually H3-1: Tn = Fcr * C. 
-                // C for Round HSS = (Pi * (D-t)^2 * t) / 2  (Approx J/2 ? No).
-                // AISC: C = J for round? No.
-                // Let's use standard Tn = Fcr * C. 
-                // Fcr = max(1.6E/... , 0.6Fy). Same as Shear G5. 
-                
-                // Let's use Chapter G check result logic if possible, or recalculate Fcr
-                // Recalculate Fcr (G5)
+                // H3.1 round HSS torsion. Recalculate Fcr with the same terms used by G5.
                 double D = input.D_pipe;
                 double t = input.t_pipe; 
-                double Lv = input.Length; // Torsion length?
+                double Lv = input.Length;
                 if (D <= 0 || t <= 0 || Lv <= 0)
                     return 0;
                 double D_t = D/t;

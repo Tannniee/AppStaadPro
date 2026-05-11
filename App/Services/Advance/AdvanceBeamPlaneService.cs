@@ -35,14 +35,9 @@ namespace StaadSteelApp.Core.Advance
                 return false;
             }
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                message = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetGeometry(out _, out object geometry, out message))
                 return false;
-            }
 
-            object geometry = os.Geometry;
             if (!AdvanceSelectionService.TryGetBeamIncidence(geometry, directionBeamId, out int nodeA, out int nodeB))
             {
                 message = $"Could not read incidence of direction beam {directionBeamId}.";

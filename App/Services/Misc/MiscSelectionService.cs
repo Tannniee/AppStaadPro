@@ -11,14 +11,9 @@ namespace StaadSteelApp.Core.Misc
             beamIds = Array.Empty<int>();
             error = string.Empty;
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                error = "Could not connect to OpenSTAAD.";
+            if (!MiscOpenStaadService.TryGetOpenStaad(out object openStaad, out error))
                 return false;
-            }
 
-            object openStaad = os;
             return OpenStaadSelectionAdapter.TryGetSelectedBeamIds(
                 openStaad,
                 true,

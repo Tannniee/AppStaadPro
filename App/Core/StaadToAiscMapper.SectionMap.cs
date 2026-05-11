@@ -131,7 +131,7 @@ namespace StaadSteelApp.Core
                 am.tfb = Tfb * MToMm;
 
                 // Name
-                // Format: I-{Deep}x{Width}x{WebThk}x{FlangeThk}x{BotWidth}x{BotThk}
+                // Format: I-{Depth}x{Width}x{WebThk}x{FlangeThk}x{BotWidth}x{BotThk}
                 double h1_mm = H1 * MToMm;
                 double h2_mm = H2 * MToMm;
                 double bf_mm = Bf * MToMm;
@@ -144,28 +144,23 @@ namespace StaadSteelApp.Core
                 {
                     // Prismatic-like Tapered
                     if (bfb_mm > 0 && tfb_mm > 0 && (Math.Abs(bf_mm - bfb_mm) > 0.1 || Math.Abs(tf_mm - tfb_mm) > 0.1))
-                        am.SectionName = $"I-{h1_mm:F0}x{tw_mm:F0}x{bf_mm:F0}x{tf_mm:F0}x{bfb_mm:F0}x{tfb_mm:F0}";
+                        am.SectionName = $"I-{h1_mm:F0}x{bf_mm:F0}x{tw_mm:F0}x{tf_mm:F0}x{bfb_mm:F0}x{tfb_mm:F0}";
                     else
-                        am.SectionName = $"I-{h1_mm:F0}x{tw_mm:F0}x{bf_mm:F0}x{tf_mm:F0}";
+                        am.SectionName = $"I-{h1_mm:F0}x{bf_mm:F0}x{tw_mm:F0}x{tf_mm:F0}";
                 }
                 else
                 {
                     // True Tapered
                     if (bfb_mm > 0 && tfb_mm > 0 && (Math.Abs(bf_mm - bfb_mm) > 0.1 || Math.Abs(tf_mm - tfb_mm) > 0.1))
-                        am.SectionName = $"I-({h1_mm:F0}-{h2_mm:F0})x{tw_mm:F0}x{bf_mm:F0}x{tf_mm:F0}x{bfb_mm:F0}x{tfb_mm:F0}";
+                        am.SectionName = $"I-({h1_mm:F0}-{h2_mm:F0})x{bf_mm:F0}x{tw_mm:F0}x{tf_mm:F0}x{bfb_mm:F0}x{tfb_mm:F0}";
                     else
-                        am.SectionName = $"I-({h1_mm:F0}-{h2_mm:F0})x{tw_mm:F0}x{bf_mm:F0}x{tf_mm:F0}";
+                        am.SectionName = $"I-({h1_mm:F0}-{h2_mm:F0})x{bf_mm:F0}x{tw_mm:F0}x{tf_mm:F0}";
                 }
             }
             else
             {
-                // Standard Logic for Prismatic / Legacy
-                // Rely on basic GetSectionPropertyValues or parsed info
-                // For simplicity, we can use the same arrProps if we map correctness, 
-                // BUT existing logic used GetSectionPropertyValues (Basic) + GetSectionPropertyValues (Values).
-                // Let's stick to the previous reliable method for non-tapered to avoid breaking regression,
-                // OR map from arrProps if we trust Ex.
-                // Let's rely on basic method for non-tapered as it fills Ag/Ix/Iy reliably including Tables.
+                // Non-tapered sections use GetSectionPropertyValues because it provides
+                // reliable Ag/Ix/Iy values for catalog and table-based properties.
                 
                 if (!OpenStaadPropertyAdapter.TryGetSectionPropertyValues(_os, refNo, out double[] sectionValues, out string legacyValuesError))
                 {
@@ -206,7 +201,7 @@ namespace StaadSteelApp.Core
                 am.tf = tfM * MToMm;
                 am.tw = twM * MToMm;
                 
-                // I-Shape assumption for now (Symmetric)
+                // Symmetric I-shape approximation for derived properties.
                 am.bfb = am.bf; 
                 am.tfb = am.tf;
 
@@ -215,34 +210,32 @@ namespace StaadSteelApp.Core
                 am.Iy = iyM4 * M4ToMm4; // m4 -> mm4
             }
 
-            // Recalculate derived properties (Zx, Sx, J, Cw) based on the (Interpolated) Dims
-            // This ensures F2 check uses the correct Section Modulus for the check location.
+            // Recalculate derived properties from local dimensions so F2 checks use
+            // the section modulus at the evaluated location.
             
-            // Reuse am props for readability
             double d = am.d;
             double bf = am.bf;
             double tf = am.tf;
             double tw = am.tw;
             double h_web = d - tf - am.tfb;
 
-            // Simple check if it looks like I-shape (all dims > 0)
+            // I-shape derived properties require all primary dimensions.
             if (d > 0 && bf > 0 && tf > 0 && tw > 0)
             {
                 double y_na = d / 2.0;
                 double Iy_top = (tf > 0 && bf > 0) ? (tf * Math.Pow(bf, 3) / 12.0) : 0.0;
                 double Iy_bot = (am.tfb > 0 && am.bfb > 0) ? (am.tfb * Math.Pow(am.bfb, 3) / 12.0) : 0.0;
                 
-                // Re-calc Area/Inertia for Tapered since we didn't get them from STAAD (or got wrong ones)
-                // For Prismatic, we overwrite Ag/Ix from STAAD with calculated ones? 
-                // BETTER: Only overwrite for Tapered. For Prismatic trust STAAD's db (rolled shapes have fillets).
+                // Tapered sections do not provide dependable section properties through
+                // OpenSTAAD, so derive them from plate dimensions. Non-tapered catalog
+                // sections keep STAAD database values to preserve fillet effects.
                 
                 if (isTapered)
                 {
-                     // Area
                      am.Ag = (bf * tf) + (am.bfb * am.tfb) + (h_web * tw); // Ignore fillets
                      
-                     // Need neutral axis for exact Ix calculation of singly symmetric section.
-                     // taking moments about bottom of bottom flange:
+                     // Neutral axis for singly symmetric sections, measured from the
+                     // bottom of the bottom flange.
                      double y_bot_flange = am.tfb / 2.0;
                      double y_web = am.tfb + h_web / 2.0;
                      double y_top_flange = am.tfb + h_web + tf / 2.0;
@@ -265,10 +258,9 @@ namespace StaadSteelApp.Core
                 am.Sx = (d > 0) ? am.Ix / Math.Max(y_na, d - y_na) : 0;
                 am.Sy = (Math.Max(bf, am.bfb) > 0) ? am.Iy / (Math.Max(bf, am.bfb) / 2.0) : 0;
 
-                // Plastic Moduli (Approximate for Singly Symmetric I-Shape)
+                // Plastic moduli approximation for singly symmetric I-shapes.
                 // Zx = Sum(A_i * |y_i - PNA|)
-                // A very simplified approach for Zx (assuming PNA in web):
-                // PNA divides area in half. Let's find PNA distance from bottom: y_pna
+                // The plastic neutral axis is estimated from equal area above and below.
                 double A_half = am.Ag / 2.0;
                 double A_bot = am.bfb * am.tfb;
                 double y_pna = am.tfb;
@@ -279,7 +271,7 @@ namespace StaadSteelApp.Core
                 }
                 
                 // Zx is first moment of area about PNA
-                // Just use numerical integration or simple blocks
+                // Sum rectangular block first moments about the plastic neutral axis.
                 double Z_bot_flange = am.bfb * am.tfb * Math.Abs(y_pna - am.tfb / 2.0);
                 double Z_top_flange = bf * tf * Math.Abs((d - tf / 2.0) - y_pna);
                 
@@ -296,7 +288,7 @@ namespace StaadSteelApp.Core
                 // Torsion Constant J
                 am.J = (1.0/3.0 * bf * Math.Pow(tf, 3)) + (1.0/3.0 * am.bfb * Math.Pow(am.tfb, 3)) + (1.0/3.0 * h_web * Math.Pow(tw, 3));
 
-                // Warping Constant Cw (Approx for Singly Symmetric - Galambos)
+                // Warping constant approximation for singly symmetric I-shapes.
                 double h0 = d - (tf + am.tfb) / 2.0;
                 am.ho = h0;
                 // For doubly/singly symmetric I-shapes, use flange minor inertias to avoid
@@ -310,7 +302,7 @@ namespace StaadSteelApp.Core
             }
             else
             {
-                // Fallback for non-standard
+                // Fallback for non-standard shapes.
                  am.Sx = (d > 0) ? 2 * am.Ix / d : 0;
                  am.Sy = (bf > 0) ? 2 * am.Iy / bf : 0;
                  am.Zx = am.Sx * 1.1; 

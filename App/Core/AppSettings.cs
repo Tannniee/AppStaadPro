@@ -17,15 +17,20 @@ namespace StaadSteelApp.Core
         }
 
         private static string SettingsPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.ini");
+        private static readonly object _settingsLock = new object();
+        private static Dictionary<string, string> _cache;
 
         public static void Save(string key, Point loc)
         {
             try
             {
-                var settings = LoadSettings();
-                settings[key + "_X"] = loc.X.ToString();
-                settings[key + "_Y"] = loc.Y.ToString();
-                SaveSettings(settings);
+                lock (_settingsLock)
+                {
+                    var settings = GetSettingsLocked();
+                    settings[key + "_X"] = loc.X.ToString();
+                    settings[key + "_Y"] = loc.Y.ToString();
+                    SaveSettings(settings);
+                }
             }
             catch (Exception ex)
             {
@@ -38,19 +43,12 @@ namespace StaadSteelApp.Core
             Point p = new Point(100, 100);
             try
             {
-                if (File.Exists(SettingsPath))
+                lock (_settingsLock)
                 {
-                    string[] lines = File.ReadAllLines(SettingsPath);
+                    var settings = GetSettingsLocked();
                     int x = 100, y = 100;
-                    foreach(var line in lines)
-                    {
-                        var parts = line.Split('=');
-                        if (parts.Length == 2)
-                        {
-                            if (parts[0].Trim() == key + "_X") int.TryParse(parts[1], out x);
-                            if (parts[0].Trim() == key + "_Y") int.TryParse(parts[1], out y);
-                        }
-                    }
+                    if (settings.TryGetValue(key + "_X", out string valueX)) int.TryParse(valueX, out x);
+                    if (settings.TryGetValue(key + "_Y", out string valueY)) int.TryParse(valueY, out y);
                     p.X = x; p.Y = y;
                 }
             }
@@ -65,9 +63,12 @@ namespace StaadSteelApp.Core
         {
             try
             {
-                var settings = LoadSettings();
-                settings[key] = value ?? string.Empty;
-                SaveSettings(settings);
+                lock (_settingsLock)
+                {
+                    var settings = GetSettingsLocked();
+                    settings[key] = value ?? string.Empty;
+                    SaveSettings(settings);
+                }
             }
             catch (Exception ex)
             {
@@ -79,10 +80,13 @@ namespace StaadSteelApp.Core
         {
             try
             {
-                var settings = LoadSettings();
-                if (settings.TryGetValue(key, out string value))
+                lock (_settingsLock)
                 {
-                    return value;
+                    var settings = GetSettingsLocked();
+                    if (settings.TryGetValue(key, out string value))
+                    {
+                        return value;
+                    }
                 }
             }
             catch (Exception ex)
@@ -93,7 +97,15 @@ namespace StaadSteelApp.Core
             return defaultValue;
         }
 
-        private static Dictionary<string, string> LoadSettings()
+        private static Dictionary<string, string> GetSettingsLocked()
+        {
+            if (_cache == null)
+                _cache = LoadSettingsFromDisk();
+
+            return _cache;
+        }
+
+        private static Dictionary<string, string> LoadSettingsFromDisk()
         {
             var settings = new Dictionary<string, string>();
             if (!File.Exists(SettingsPath))

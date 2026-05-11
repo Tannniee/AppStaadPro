@@ -5,74 +5,74 @@ namespace StaadSteelApp.Core
 {
     public static class MiscToolsService
     {
-        public static void ApplyReleasesSelected(Worksheet ws)
+        public static ServiceOperationResult ApplyReleasesSelected(Worksheet ws)
         {
-            MemberReleaseService.ApplyReleasesSelected(ws);
+            return MemberReleaseService.ApplyReleasesSelected(ws);
         }
 
-        public static void ApplyReleasesSelected(int[] startDof, int[] endDof)
+        public static ServiceOperationResult ApplyReleasesSelected(int[] startDof, int[] endDof)
         {
-            MemberReleaseService.ApplyReleasesSelected(startDof, endDof);
+            return MemberReleaseService.ApplyReleasesSelected(startDof, endDof);
         }
 
-        public static void ApplyBetaAngleSelected(Worksheet ws)
+        public static ServiceOperationResult ApplyBetaAngleSelected(Worksheet ws)
         {
-            MemberBetaService.ApplyBetaAngleSelected(ws);
+            return MemberBetaService.ApplyBetaAngleSelected(ws);
         }
 
-        public static void ApplyBetaAngleSelected(double angle)
+        public static ServiceOperationResult ApplyBetaAngleSelected(double angle)
         {
-            MemberBetaService.ApplyBetaAngleSelected(angle);
+            return MemberBetaService.ApplyBetaAngleSelected(angle);
         }
 
-        public static void ApplyNormalMemberSpecSelected()
+        public static ServiceOperationResult ApplyNormalMemberSpecSelected()
         {
-            MemberSpecService.ApplyMemberSpecSelected(MiscMemberSpecType.Normal);
+            return MemberSpecService.ApplyMemberSpecSelected(MiscMemberSpecType.Normal);
         }
 
-        public static void ApplyTrussMemberSpecSelected()
+        public static ServiceOperationResult ApplyTrussMemberSpecSelected()
         {
-            MemberSpecService.ApplyMemberSpecSelected(MiscMemberSpecType.Truss);
+            return MemberSpecService.ApplyMemberSpecSelected(MiscMemberSpecType.Truss);
         }
 
-        public static void ApplyTensionMemberSpecSelected()
+        public static ServiceOperationResult ApplyTensionMemberSpecSelected()
         {
-            MemberSpecService.ApplyMemberSpecSelected(MiscMemberSpecType.Tension);
+            return MemberSpecService.ApplyMemberSpecSelected(MiscMemberSpecType.Tension);
         }
 
-        public static void ApplyCompressionMemberSpecSelected()
+        public static ServiceOperationResult ApplyCompressionMemberSpecSelected()
         {
-            MemberSpecService.ApplyMemberSpecSelected(MiscMemberSpecType.Compression);
+            return MemberSpecService.ApplyMemberSpecSelected(MiscMemberSpecType.Compression);
         }
 
-        public static void CopySelectedMemberIds()
+        public static ServiceOperationResult CopySelectedMemberIds(out string clipboardText)
         {
-            MemberIdClipboardService.CopySelectedMemberIds();
+            return MemberIdClipboardService.CopySelectedMemberIds(out clipboardText);
         }
 
-        public static void ResetDefaultSelected()
+        public static ServiceOperationResult ResetDefaultSelected()
         {
-            MemberReleaseService.ResetDefaultSelected();
+            return MemberReleaseService.ResetDefaultSelected();
         }
 
-        public static void ApplyFixedSupportSelected()
+        public static ServiceOperationResult ApplyFixedSupportSelected()
         {
-            SupportService.ApplyFixed_Selected();
+            return SupportService.ApplyFixed_Selected();
         }
 
-        public static void ApplyPinnedSupportSelected()
+        public static ServiceOperationResult ApplyPinnedSupportSelected()
         {
-            SupportService.ApplyPinned_Selected();
+            return SupportService.ApplyPinned_Selected();
         }
 
-        public static void ApplyFixedButSupportSelected(int[] releaseSpec, double[] springSpec)
+        public static ServiceOperationResult ApplyFixedButSupportSelected(int[] releaseSpec, double[] springSpec)
         {
-            SupportService.ApplyFixedBut_Selected(releaseSpec, springSpec);
+            return SupportService.ApplyFixedBut_Selected(releaseSpec, springSpec);
         }
 
-        public static void RemoveSupportSelected()
+        public static ServiceOperationResult RemoveSupportSelected()
         {
-            SupportService.RemoveSupport_Selected();
+            return SupportService.RemoveSupport_Selected();
         }
     }
 }

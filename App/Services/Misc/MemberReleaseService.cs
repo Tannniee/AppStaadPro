@@ -20,7 +20,7 @@ namespace StaadSteelApp.Core.Misc
         private const string CELL_MOM_Z_START = "D20";
         private const string CELL_MOM_Z_END = "E20";
 
-        internal static void ApplyReleasesSelected(Worksheet ws)
+        internal static ServiceOperationResult ApplyReleasesSelected(Worksheet ws)
         {
             int[] startDof = new int[6];
             startDof[0] = BoolToInt(IsMark(ws.Range[CELL_AXIAL_START].Value));
@@ -38,21 +38,23 @@ namespace StaadSteelApp.Core.Misc
             endDof[4] = BoolToInt(IsMark(ws.Range[CELL_MOM_Y_END].Value));
             endDof[5] = BoolToInt(IsMark(ws.Range[CELL_MOM_Z_END].Value));
 
-            ApplyReleasesSelected(startDof, endDof);
+            return ApplyReleasesSelected(startDof, endDof);
         }
 
-        internal static void ApplyReleasesSelected(int[] startDofInput, int[] endDofInput)
+        internal static ServiceOperationResult ApplyReleasesSelected(int[] startDofInput, int[] endDofInput)
         {
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null) return;
+            if (!MiscOpenStaadService.TryGetProperty(out object propObj, out string propertyError))
+            {
+                Debug.WriteLine(propertyError);
+                return ServiceOperationResult.Error("Member Releases", propertyError);
+            }
 
             if (!MiscSelectionService.TryGetSelectedBeamIds(out int[] beamIds, out string selectionError))
             {
                 string message = string.IsNullOrWhiteSpace(selectionError)
                     ? "Could not read STAAD selection."
                     : selectionError;
-                TopMostMessageBox.ShowInfo(message, "Info");
-                return;
+                return ServiceOperationResult.Info("Member Releases", message);
             }
 
             int beamCount = beamIds.Length;
@@ -61,11 +63,9 @@ namespace StaadSteelApp.Core.Misc
                 string message = string.IsNullOrWhiteSpace(selectionError)
                     ? "Please select beams in STAAD."
                     : "Could not read STAAD selection: " + selectionError;
-                TopMostMessageBox.ShowInfo(message, "Info");
-                return;
+                return ServiceOperationResult.Info("Member Releases", message);
             }
 
-            object propObj = os.Property;
             int[] startDof = NormalizeReleaseDof(startDofInput);
             int[] endDof = NormalizeReleaseDof(endDofInput);
 
@@ -75,8 +75,7 @@ namespace StaadSteelApp.Core.Misc
             if (!startOk)
             {
                 Debug.WriteLine("Apply start releases failed: " + startError);
-                TopMostMessageBox.ShowError("Apply start releases failed: " + startError, "Member Releases");
-                return;
+                return ServiceOperationResult.Error("Member Releases", "Apply start releases failed: " + startError);
             }
 
             bool endOk = HasRelease(endDof)
@@ -85,40 +84,40 @@ namespace StaadSteelApp.Core.Misc
             if (!endOk)
             {
                 Debug.WriteLine("Apply end releases failed: " + endError);
-                TopMostMessageBox.ShowError("Apply end releases failed: " + endError, "Member Releases");
-                return;
+                return ServiceOperationResult.Error("Member Releases", "Apply end releases failed: " + endError);
             }
 
-            TopMostMessageBox.ShowSuccess($"Releases applied to {beamCount} beams.", "Member Releases");
+            return ServiceOperationResult.Success("Member Releases", $"Releases applied to {beamCount} beams.");
         }
 
-        internal static void ResetDefaultSelected()
+        internal static ServiceOperationResult ResetDefaultSelected()
         {
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null) return;
+            if (!MiscOpenStaadService.TryGetProperty(out object propObj, out string propertyError))
+            {
+                Debug.WriteLine(propertyError);
+                return ServiceOperationResult.Error("Reset Members", propertyError);
+            }
 
             if (!MiscSelectionService.TryGetSelectedBeamIds(out int[] beamIds, out string _selectionError))
-                return;
+                return ServiceOperationResult.Info("Reset Members", "Could not read STAAD selection.");
 
             if (beamIds.Length == 0)
-                return;
+                return ServiceOperationResult.Info("Reset Members", "Please select beams in STAAD.");
 
-            object propObj = os.Property;
             bool clearStart = TryRemoveRelease(propObj, beamIds, 0, out string startError);
             bool clearEnd = TryRemoveRelease(propObj, beamIds, 1, out string endError);
 
             if (clearStart && clearEnd)
             {
-                TopMostMessageBox.ShowSuccess(
-                    "Member releases reset. Local axes beta is not changed (clear manually in STAAD).",
-                    "Reset Members");
-                return;
+                return ServiceOperationResult.Success(
+                    "Reset Members",
+                    "Member releases reset. Local axes beta is not changed (clear manually in STAAD).");
             }
 
             string message = "Reset completed with issues:";
             if (!clearStart) message += "\n- Start release: " + startError;
             if (!clearEnd) message += "\n- End release: " + endError;
-            TopMostMessageBox.ShowWarning(message, "Reset Members");
+            return ServiceOperationResult.Warning("Reset Members", message);
         }
 
         private static bool IsMark(object cellValue)

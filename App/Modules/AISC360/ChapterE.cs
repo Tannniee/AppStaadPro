@@ -241,25 +241,9 @@ namespace StaadSteelApp.AISC360
                 
                 if (input.IsAngle)
                 {
-                    // Angle: Symmetry is Principal Axis for Equality, but here we approximate.
-                    // Geometric axes (parallel to legs) are input as rx, ry.
-                    // Principal axes u, v are rotated.
-                    // For E4, we need checks about Symmetry Axis.
-                    // For Equal Angle, Symmetry Axis is the diagonal (u or v).
-                    
-                    // Allow to proceed with E4 using Geometric properties approximation
-                    // This might not be 100% exact to the legacy principal-axis check, but it is closer than skipping.
-                    // We need Fe_sym. For Equal Angle, Fe_sym is related to the axis of symmetry.
-                    // Axis of Symmetry = Principal Axis Minor? No, Major for L shape.
-                    // For Equal Angle, Principal Minor (z) is the axis of symmetry? 
-                    // No, Principal Major (w) is axis of symmetry for 90 deg angle?
-                    // Actually, for L shape, the axis of symmetry passes through the corner.
-                    // Bending about this axis involves both legs.
-                    
-                    // To avoid complexity, we assume Fe_sym approx min(Fex, Fey) for now?
-                    // Or better, let E4 run with current inputs and see result.
-                    // The legacy implementation used principal properties.
-                    
+                    // Principal-axis properties are not available in this path. Use the
+                    // smaller geometric-axis elastic buckling stress as a conservative
+                    // approximation for the angle symmetry-axis term.
                     Fe_sym = Math.Min(Fex, Fey); // Conservative assumption
                 }
                 else if (input.IsTee)

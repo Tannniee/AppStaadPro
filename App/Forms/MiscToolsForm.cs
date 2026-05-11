@@ -41,8 +41,10 @@ namespace StaadSteelApp
             };
             btnReset.Click += (s, e) =>
             {
-                MiscToolsService.ResetDefaultSelected();
-                ClearReleaseChecks();
+                ServiceOperationResult result = MiscToolsService.ResetDefaultSelected();
+                ServiceOperationResultPresenter.Show(result);
+                if (result != null && result.Succeeded)
+                    ClearReleaseChecks();
             };
 
             var btnApplyReleases = new Button
@@ -103,7 +105,7 @@ namespace StaadSteelApp
                 Location = new Point(20, 24),
                 Size = new Size(100, 26)
             };
-            btnNormal.Click += (s, e) => MiscToolsService.ApplyNormalMemberSpecSelected();
+            btnNormal.Click += (s, e) => ServiceOperationResultPresenter.Show(MiscToolsService.ApplyNormalMemberSpecSelected());
 
             var btnTruss = new Button
             {
@@ -111,7 +113,7 @@ namespace StaadSteelApp
                 Location = new Point(140, 24),
                 Size = new Size(100, 26)
             };
-            btnTruss.Click += (s, e) => MiscToolsService.ApplyTrussMemberSpecSelected();
+            btnTruss.Click += (s, e) => ServiceOperationResultPresenter.Show(MiscToolsService.ApplyTrussMemberSpecSelected());
 
             var btnTension = new Button
             {
@@ -119,7 +121,7 @@ namespace StaadSteelApp
                 Location = new Point(20, 56),
                 Size = new Size(100, 26)
             };
-            btnTension.Click += (s, e) => MiscToolsService.ApplyTensionMemberSpecSelected();
+            btnTension.Click += (s, e) => ServiceOperationResultPresenter.Show(MiscToolsService.ApplyTensionMemberSpecSelected());
 
             var btnCompression = new Button
             {
@@ -127,7 +129,7 @@ namespace StaadSteelApp
                 Location = new Point(140, 56),
                 Size = new Size(100, 26)
             };
-            btnCompression.Click += (s, e) => MiscToolsService.ApplyCompressionMemberSpecSelected();
+            btnCompression.Click += (s, e) => ServiceOperationResultPresenter.Show(MiscToolsService.ApplyCompressionMemberSpecSelected());
 
             grpMemberType.Controls.Add(btnNormal);
             grpMemberType.Controls.Add(btnTruss);
@@ -147,7 +149,7 @@ namespace StaadSteelApp
                 Location = new Point(20, 24),
                 Size = new Size(100, 26)
             };
-            btnFixed.Click += (s, e) => MiscToolsService.ApplyFixedSupportSelected();
+            btnFixed.Click += (s, e) => ServiceOperationResultPresenter.Show(MiscToolsService.ApplyFixedSupportSelected());
 
             var btnPinned = new Button
             {
@@ -155,7 +157,7 @@ namespace StaadSteelApp
                 Location = new Point(140, 24),
                 Size = new Size(100, 26)
             };
-            btnPinned.Click += (s, e) => MiscToolsService.ApplyPinnedSupportSelected();
+            btnPinned.Click += (s, e) => ServiceOperationResultPresenter.Show(MiscToolsService.ApplyPinnedSupportSelected());
 
             var btnFixedBut = new Button
             {
@@ -171,7 +173,7 @@ namespace StaadSteelApp
                 Location = new Point(140, 56),
                 Size = new Size(100, 26)
             };
-            btnNone.Click += (s, e) => MiscToolsService.RemoveSupportSelected();
+            btnNone.Click += (s, e) => ServiceOperationResultPresenter.Show(MiscToolsService.RemoveSupportSelected());
 
             grpSupport.Controls.Add(btnFixed);
             grpSupport.Controls.Add(btnPinned);
@@ -282,7 +284,7 @@ namespace StaadSteelApp
             {
                 int[] start = ReadChecks(_startChecks);
                 int[] end = ReadChecks(_endChecks);
-                MiscToolsService.ApplyReleasesSelected(start, end);
+                ServiceOperationResultPresenter.Show(MiscToolsService.ApplyReleasesSelected(start, end));
             }
             catch (Exception ex)
             {
@@ -300,7 +302,7 @@ namespace StaadSteelApp
 
             try
             {
-                MiscToolsService.ApplyBetaAngleSelected(angle);
+                ServiceOperationResultPresenter.Show(MiscToolsService.ApplyBetaAngleSelected(angle));
             }
             catch (Exception ex)
             {
@@ -317,7 +319,7 @@ namespace StaadSteelApp
 
                 try
                 {
-                    MiscToolsService.ApplyFixedButSupportSelected(form.ReleaseSpec, form.SpringSpec);
+                    ServiceOperationResultPresenter.Show(MiscToolsService.ApplyFixedButSupportSelected(form.ReleaseSpec, form.SpringSpec));
                 }
                 catch (Exception ex)
                 {
@@ -330,7 +332,11 @@ namespace StaadSteelApp
         {
             try
             {
-                MiscToolsService.CopySelectedMemberIds();
+                ServiceOperationResult result = MiscToolsService.CopySelectedMemberIds(out string clipboardText);
+                if (result != null && result.Succeeded && !string.IsNullOrWhiteSpace(clipboardText))
+                    Clipboard.SetText(clipboardText);
+
+                ServiceOperationResultPresenter.Show(result);
             }
             catch (Exception ex)
             {

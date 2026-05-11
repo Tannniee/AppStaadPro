@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using StaadSteelApp.Core;
 
 namespace StaadSteelApp.Core.Interop
 {
@@ -12,8 +13,9 @@ namespace StaadSteelApp.Core.Interop
                 object result = ComInvoke.Invoke(geometry, "GetFlagForHiddenEntities");
                 return Convert.ToInt32(result, CultureInfo.InvariantCulture);
             }
-            catch
+            catch (Exception ex)
             {
+                AppLogger.Exception("OpenSTAAD did not return the hidden-entities flag.", ex);
                 return null;
             }
         }
@@ -24,8 +26,9 @@ namespace StaadSteelApp.Core.Interop
             {
                 ComInvoke.Invoke(geometry, "SetFlagForHiddenEntities", new object[] { flagValue });
             }
-            catch
+            catch (Exception ex)
             {
+                AppLogger.Exception("OpenSTAAD did not accept the hidden-entities flag update.", ex);
             }
         }
     }

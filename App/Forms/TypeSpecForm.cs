@@ -10,7 +10,6 @@ namespace StaadSteelApp
     internal sealed class TypeSpecForm : Form
     {
         private readonly ComboBox _cboType;
-        // private readonly Label _lblHelp; // Removed
         private readonly Label _lblSpec1;
         private readonly Label _lblSpec2;
         private readonly Label _lblSpec3;
@@ -40,7 +39,7 @@ namespace StaadSteelApp
             StartPosition = FormStartPosition.Manual;
             ShowInTaskbar = false;
             BackColor = SystemColors.Control;
-            ClientSize = new Size(300, 195); // Make room for 4 rows at common DPI
+            ClientSize = new Size(300, 195);
 
             var lblType = new Label
             {
@@ -53,7 +52,7 @@ namespace StaadSteelApp
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Location = new Point(60, 12),
-                Size = new Size(228, 21) // Adjusted for narrower width
+                Size = new Size(228, 21)
             };
             _cboType.SelectedIndexChanged += (s, e) => { UpdateSpecFields(); OnValueChanged(); };
 
@@ -115,9 +114,7 @@ namespace StaadSteelApp
             Controls.Add(lblType);
             Controls.Add(_cboType);
             Controls.Add(_grpParams);
-            // Controls.Add(grpHelp); // Removed
-            
-            // Apply Rounded Corners
+
             this.Load += (s, e) => ApplyRounding();
         }
 
@@ -160,9 +157,6 @@ namespace StaadSteelApp
             _txtSpec2.Text = string.IsNullOrWhiteSpace(spec2) ? "0" : spec2;
             _txtSpec3.Text = string.IsNullOrWhiteSpace(spec3) ? "0" : spec3;
             _txtSpec4.Text = string.IsNullOrWhiteSpace(spec4) ? "0" : spec4;
-            
-            // _lblHelp.Text = helpText ?? ""; // Removed
-
             UpdateSpecFields();
         }
 
@@ -234,10 +228,7 @@ namespace StaadSteelApp
 
             if (!visible)
             {
-               // Keep value, don't reset to 0 unless needed (avoid wiping data if user switches type temporarily)
-               // However, if we want to mimic previous behavior:
-               // textBox.Text = "0"; 
-               // The previous behavior reset it. Let's keep it safe.
+               // Preserve values while users switch between Type Spec modes.
                return; 
             }
             if (string.IsNullOrWhiteSpace(textBox.Text)) textBox.Text = "0";

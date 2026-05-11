@@ -7,7 +7,7 @@ namespace StaadSteelApp
 {
     public partial class MainForm
     {
-        private sealed class LegacySectionController
+        private sealed partial class LegacySectionController
         {
             private readonly MainForm _owner;
             private readonly StaadSteelApp.LegacyDatabaseService _service;

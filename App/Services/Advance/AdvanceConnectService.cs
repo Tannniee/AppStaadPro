@@ -20,14 +20,9 @@ namespace StaadSteelApp.Core.Advance
                 return false;
             }
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                message = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetGeometry(out _, out object geometry, out message))
                 return false;
-            }
 
-            object geometry = os.Geometry;
             if (!AdvanceSelectionService.TryLoadSelectedNodeData(geometry, selectedNodeIds, out int[] validNodeIds, out List<AdvanceNodeData> nodes, out message))
                 return false;
 
@@ -73,14 +68,9 @@ namespace StaadSteelApp.Core.Advance
                 return false;
             }
 
-            dynamic os = StaadManager.GetOpenSTAAD();
-            if (os == null)
-            {
-                message = "Could not connect to OpenSTAAD.";
+            if (!AdvanceOpenStaadService.TryGetGeometry(out _, out object geometry, out message))
                 return false;
-            }
 
-            object geometry = os.Geometry;
             if (!AdvanceSelectionService.TryLoadSelectedNodeData(geometry, selectedNodeIds, out int[] validNodeIds, out List<AdvanceNodeData> nodes, out message))
                 return false;
 

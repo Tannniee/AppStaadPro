@@ -7,20 +7,23 @@ namespace StaadSteelApp.Core
 {
     public static partial class SectionService
     {
-        private static SectionInfo BuildSectionInfoFromProperty(dynamic os, int propID, string propName, string matName)
+        private static SectionInfo BuildSectionInfoFromProperty(object os, int propID, string propName, string matName)
         {
-             if (os == null) throw new Exception("Not connected to STAAD Application.");
-             if (propID <= 0) throw new Exception("Invalid property id.");
+             if (os == null) throw new StaadConnectionException("Not connected to STAAD Application.");
+             if (propID <= 0) throw new SectionPropertyException("Invalid property id.");
 
              // Get Dimensions
              int lRetType = 0;
              double[] arrProps = new double[25];
              // GetSectionPropertyValuesEx uses ByRef outputs, including the values array.
-             // Start with a pre-allocated array and fall back to reflection if dynamic dispatch fails.
+             // Start with a pre-allocated array and fall back to reflection if COM dispatch fails.
              // Note: GetSectionPropertyValuesEx params: (propID, ref lRetType, arrProps)
              // lRetType is ref. arrProps is array.
 
-             object propObj = os.Property;
+             object openStaad = os;
+             if (!TryGetSectionProperty(openStaad, out object propObj, out string propertyError))
+                 throw new SectionPropertyException(propertyError);
+
              bool propsLoaded = false;
              if (OpenStaadPropertyAdapter.TryGetSectionPropertyValuesExFromProperty(propObj, propID, out lRetType, out arrProps, out string valuesExError))
              {
@@ -185,10 +188,8 @@ namespace StaadSteelApp.Core
                  // --- PRISMATIC TEE ---
                  case 673: // scPrismaticTee
                      info.PropType = eFramePropType.T;
-                     // Prismatic Tee stores: arrProps[0]=AX, arrProps[1]=IX, arrProps[2]=IY, arrProps[3]=IZ
-                     // Tee dimensions are complex to reverse-calculate from properties
-                     // For now, use placeholder - user should input new dimensions
-                     // TODO: Implement proper reverse calculation if needed
+                     // Prismatic Tee stores section properties rather than explicit tee dimensions.
+                     // Preserve a deterministic estimate so detect/paste stays usable without inventing exact geometry.
                      double teeArea = arrProps[0];
                      info.H1 = Math.Sqrt(teeArea) * 2; // Approximate depth
                      info.Bf = Math.Sqrt(teeArea) * 2; // Approximate width
@@ -410,168 +411,5 @@ namespace StaadSteelApp.Core
              return info;
         }
 
-        private static string TryGetMaterialNameFromProperty(dynamic os, int propertyId)
-        {
-            if (os == null || propertyId <= 0)
-                return "";
-
-            try
-            {
-                object propObj = os.Property;
-                int count = TryGetAssignedBeamCount(propObj, propertyId);
-                if (count <= 0)
-                    return "";
-
-                int firstBeamId = 0;
-                foreach (int beamId in TryGetAssignedBeamList(propObj, propertyId, count))
-                {
-                    if (beamId > 0)
-                    {
-                        firstBeamId = beamId;
-                        break;
-                    }
-                }
-                if (firstBeamId <= 0)
-                    return "";
-
-                object openStaad = os;
-                return OpenStaadPropertyAdapter.TryGetBeamMaterialName(openStaad, firstBeamId, out string materialName, out _)
-                    ? materialName
-                    : "";
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"TryGetMaterialNameFromProperty failed for prop {propertyId}: {ex.Message}");
-                return "";
-            }
-        }
-
-        private static int[] ToIntArray(object raw)
-        {
-            if (raw == null) return Array.Empty<int>();
-
-            if (raw is int singleInt)
-                return singleInt > 0 ? new[] { singleInt } : Array.Empty<int>();
-
-            if (raw is int[] typed)
-            {
-                var cleaned = new List<int>(typed.Length);
-                var seen = new HashSet<int>();
-                foreach (int v in typed)
-                {
-                    if (v <= 0) continue;
-                    if (seen.Add(v))
-                        cleaned.Add(v);
-                }
-                return cleaned.ToArray();
-            }
-
-            if (raw is Array arr)
-            {
-                var cleaned = new List<int>(arr.Length);
-                var seen = new HashSet<int>();
-                foreach (object item in arr)
-                {
-                    int v;
-                    try
-                    {
-                        v = Convert.ToInt32(item);
-                    }
-                    catch (Exception)
-                    {
-                        continue;
-                    }
-
-                    if (v <= 0) continue;
-                    if (seen.Add(v))
-                        cleaned.Add(v);
-                }
-                return cleaned.ToArray();
-            }
-
-            return Array.Empty<int>();
-        }
-
-        private static double[] ToDoubleArray(object raw, int minLength)
-        {
-            var values = new List<double>();
-
-            if (raw is double[] doubles)
-            {
-                values.AddRange(doubles);
-            }
-            else if (raw is Array arr)
-            {
-                foreach (object item in arr)
-                {
-                    try
-                    {
-                        values.Add(Convert.ToDouble(item));
-                    }
-                    catch (Exception)
-                    {
-                        values.Add(0.0);
-                    }
-                }
-            }
-
-            while (values.Count < minLength)
-                values.Add(0.0);
-
-            return values.ToArray();
-        }
-
-        public static List<string> GetIsotropicMaterialNames(dynamic os)
-        {
-            var materials = new List<string>();
-            if (os == null) return materials;
-
-            object propObj = os.Property;
-            if (!OpenStaadPropertyAdapter.TryGetIsotropicMaterialCount(propObj, out int count, out string countError))
-            {
-                WarnOnce("IsotropicMaterialCount", "Could not read isotropic material count from STAAD. Material dropdown may be incomplete. " + countError);
-                return materials;
-            }
-
-            if (count <= 0) return materials;
-
-            var uniqueNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            // OpenSTAAD doc: varMatNo is zero-based index.
-            void ReadMaterials(int startInclusive, int endExclusive)
-            {
-                for (int i = startInclusive; i < endExclusive; i++)
-                {
-                    if (OpenStaadPropertyAdapter.TryGetIsotropicMaterialName(propObj, i, out string name, out string readError))
-                    {
-                        if (!string.IsNullOrWhiteSpace(name) && uniqueNames.Add(name))
-                            materials.Add(name);
-                    }
-                    else
-                    {
-                        // Many STAAD builds throw for out-of-range indices; only warn if nothing loads at all.
-                        if (materials.Count == 0 && i <= startInclusive)
-                            WarnOnce("IsotropicMaterials:Read", "Could not read isotropic material properties from STAAD. Material dropdown may be incomplete. " + readError);
-                    }
-                }
-            }
-
-            ReadMaterials(0, count);
-
-            // Compatibility fallback for versions that unexpectedly behave as one-based.
-            if (materials.Count == 0)
-            {
-                ReadMaterials(1, count + 1);
-                if (materials.Count == 0)
-                    WarnOnce("IsotropicMaterials:Empty", "STAAD reported isotropic materials, but none could be read. Material dropdown may be incomplete.");
-            }
-
-            return materials;
-        }
-
-        private static double GetArrayValue(double[] values, int index)
-        {
-            return values != null && index >= 0 && index < values.Length ? values[index] : 0.0;
-        }
     }
 }
