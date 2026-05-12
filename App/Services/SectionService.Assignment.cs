@@ -23,6 +23,10 @@ namespace StaadSteelApp.Core
              }
 
              int[] arrBeams = GetSelectedBeamIDs(geometryObj);
+             int selectedMemberCount = arrBeams.Length;
+             bool selectedPhysicalMembers = TryGetSelectedPhysicalMemberCount(geometryObj, out int physicalMemberCount);
+             if (selectedPhysicalMembers)
+                 selectedMemberCount = physicalMemberCount;
              
              if (arrBeams.Length == 0)
              {
@@ -73,7 +77,7 @@ namespace StaadSteelApp.Core
                      if (!materialAssigned) materialText += $" (Error: {materialError})";
                  }
                  
-                 string msg = $"- {info.Name} (ID: {propID})\n- {arrBeams.Length} beams assigned\n- Material: {materialText}";
+                 string msg = BuildSectionAssignmentMessage(info.Name, propID, selectedMemberCount, selectedPhysicalMembers, arrBeams.Length, materialText);
                  if (!verified)
                  {
                      string warning = string.IsNullOrWhiteSpace(assignError)
@@ -140,6 +144,41 @@ namespace StaadSteelApp.Core
                 error = $"assigned to {success}/{beams.Length} members";
 
             return false;
+        }
+
+        private static bool TryGetSelectedPhysicalMemberCount(object geometryObj, out int physicalMemberCount)
+        {
+            physicalMemberCount = 0;
+            if (!OpenStaadSelectionAdapter.TryGetSelectedPhysicalMemberIdsFromGeometry(
+                    geometryObj,
+                    out int[] physicalMemberIds,
+                    out string physicalError))
+            {
+                Debug.WriteLine("Get selected physical members failed: " + physicalError);
+                return false;
+            }
+
+            physicalMemberCount = physicalMemberIds.Length;
+            return physicalMemberCount > 0;
+        }
+
+        private static string BuildSectionAssignmentMessage(
+            string sectionName,
+            int propID,
+            int selectedMemberCount,
+            bool selectedPhysicalMembers,
+            int analyticalBeamCount,
+            string materialText)
+        {
+            string selectionLine = selectedPhysicalMembers
+                ? $"- {selectedMemberCount} selected physical member(s)"
+                : $"- {selectedMemberCount} selected beam(s)";
+
+            string assignedLine = selectedPhysicalMembers && analyticalBeamCount != selectedMemberCount
+                ? $"- {analyticalBeamCount} analytical beam(s) assigned"
+                : $"- {analyticalBeamCount} beam(s) assigned";
+
+            return $"- {sectionName} (ID: {propID})\n{selectionLine}\n{assignedLine}\n- Material: {materialText}";
         }
 
         private static bool TryAssignPropertyToMembers(object propObj, int[] beams, int propID, out string error, out bool verified)

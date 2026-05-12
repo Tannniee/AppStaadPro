@@ -70,5 +70,31 @@ namespace StaadSteelApp.Core.Interop
 
             return true;
         }
+
+        internal static bool TryGetSelectedPhysicalMemberIdsFromGeometry(
+            object geometry,
+            out int[] physicalMemberIds,
+            out string error)
+        {
+            physicalMemberIds = Array.Empty<int>();
+            error = string.Empty;
+
+            if (geometry == null)
+            {
+                error = "OpenSTAAD Geometry object is not available.";
+                return false;
+            }
+
+            if (!TryGetSelectionCount(geometry, "GetNoOfSelectedPhysicalMembers", out int physicalCount, out error))
+                return false;
+
+            if (physicalCount <= 0)
+                return true;
+
+            physicalMemberIds = NormalizeIds(
+                TryGetSelectedIds(geometry, "GetSelectedPhysicalMembers", physicalCount, new[] { 0, 1 }),
+                out _);
+            return true;
+        }
     }
 }
