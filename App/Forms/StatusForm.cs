@@ -9,6 +9,11 @@ namespace StaadSteelApp
     // Persistent Status Form (Always Visible)
     internal sealed class StatusForm : Form
     {
+        private const int MinPanelWidth = 300;
+        private const int MaxPanelWidth = 520;
+        private const int MinPanelHeight = 80;
+        private const int MaxPanelHeight = 360;
+
         private static StatusForm _instance;
         private Label _lblTitle;
         private Label _lblBody;
@@ -38,7 +43,9 @@ namespace StaadSteelApp
             this.StartPosition = FormStartPosition.Manual;
             this.TopMost = true;
             this.ShowInTaskbar = false;
-            this.Size = new Size(300, 110); // Increased height for list
+            this.Size = new Size(MinPanelWidth, 110);
+            this.MinimumSize = new Size(MinPanelWidth, MinPanelHeight);
+            this.MaximumSize = new Size(MaxPanelWidth, MaxPanelHeight);
             this.BackColor = SystemColors.Control;
             this.Text = "Status Panel";
             this.Padding = new Padding(3);
@@ -67,7 +74,7 @@ namespace StaadSteelApp
             _lblBody.TextAlign = ContentAlignment.TopCenter; // Default to center for simple messages
             _lblBody.Font = new Font("Microsoft Sans Serif", 9f, FontStyle.Regular);
             _lblBody.BackColor = Color.Transparent;
-            _lblBody.Padding = new Padding(10, 5, 0, 0); // Slight left padding
+            _lblBody.Padding = new Padding(14, 6, 8, 8);
 
             grp.Controls.Add(_lblBody);
             grp.Controls.Add(_lblTitle); // Add Title last to dock to top correctly (inverted z-order in some designers, but strict code order: add last = top of z-order? No, Dock order matters. Dock=Top added last stays at top if no other Dock=Top? Actually safest is simple order)
@@ -143,6 +150,10 @@ namespace StaadSteelApp
                 _lblBody.TextAlign = ContentAlignment.MiddleCenter; // Revert to center for simple toasts
             }
 
+            ResizeToFitMessage(msg, !string.IsNullOrEmpty(title));
+            ApplyRounding();
+            KeepWithinWorkingArea();
+
             // Restart auto-hide timer on every message update.
             _hideTimer.Stop();
             if (autoHideMs > 0)
@@ -150,6 +161,55 @@ namespace StaadSteelApp
                 _hideTimer.Interval = autoHideMs;
                 _hideTimer.Start();
             }
+        }
+
+        private void ResizeToFitMessage(string msg, bool hasTitle)
+        {
+            string body = string.IsNullOrEmpty(msg) ? " " : msg;
+
+            int textMaxWidth = MaxPanelWidth - 34;
+            Size measured = TextRenderer.MeasureText(
+                body,
+                _lblBody.Font,
+                new Size(textMaxWidth, int.MaxValue),
+                TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
+
+            int desiredWidth = Math.Max(MinPanelWidth, Math.Min(MaxPanelWidth, measured.Width + 44));
+            int bodyWidth = Math.Max(120, desiredWidth - 34);
+
+            measured = TextRenderer.MeasureText(
+                body,
+                _lblBody.Font,
+                new Size(bodyWidth, int.MaxValue),
+                TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
+
+            int titleHeight = hasTitle ? 25 : 0;
+            int desiredHeight = measured.Height + titleHeight + 46;
+            desiredHeight = Math.Max(MinPanelHeight, Math.Min(MaxPanelHeight, desiredHeight));
+
+            Size = new Size(desiredWidth, desiredHeight);
+        }
+
+        private void KeepWithinWorkingArea()
+        {
+            Rectangle workArea = Owner == null
+                ? Screen.FromControl(this).WorkingArea
+                : Screen.FromControl(Owner).WorkingArea;
+
+            int x = Left;
+            int y = Top;
+
+            if (Right > workArea.Right)
+                x = workArea.Right - Width - 4;
+            if (x < workArea.Left)
+                x = workArea.Left + 4;
+
+            if (Bottom > workArea.Bottom)
+                y = workArea.Bottom - Height - 4;
+            if (y < workArea.Top)
+                y = workArea.Top + 4;
+
+            Location = new Point(x, y);
         }
 
         // Static helper
