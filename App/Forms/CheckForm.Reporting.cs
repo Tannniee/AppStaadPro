@@ -344,14 +344,14 @@ namespace StaadSteelApp
         {
             if (_currentResults == null) return;
             Clipboard.SetText(BuildDetailedCopyText());
-            MessageBox.Show("Check detail copied to clipboard!", "Copied", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            TopMostMessageBox.ShowSuccess("Check detail copied to clipboard.", "Copied");
         }
 
         private void BtnCopyDetail_Click(object sender, EventArgs e)
         {
             if (_currentResults == null) return;
             Clipboard.SetText(BuildDetailedCopyText());
-            MessageBox.Show("Check detail copied to clipboard!", "Copied", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            TopMostMessageBox.ShowSuccess("Check detail copied to clipboard.", "Copied");
         }
 
 

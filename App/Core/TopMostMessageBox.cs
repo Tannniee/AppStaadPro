@@ -19,24 +19,23 @@ namespace StaadSteelApp
         public static DialogResult Show(string text, string caption)
         {
             LogMessage(text, caption, MessageBoxIcon.None);
-            // Use the caption as a compatibility hint for status color.
-            string safeCaption = caption ?? string.Empty;
-            Color? color = null;
-            if (safeCaption.IndexOf("Error", System.StringComparison.OrdinalIgnoreCase) >= 0) color = Color.Red;
-            else if (safeCaption.IndexOf("Warning", System.StringComparison.OrdinalIgnoreCase) >= 0) color = Color.Goldenrod;
-            else if (safeCaption.IndexOf("Success", System.StringComparison.OrdinalIgnoreCase) >= 0) color = Color.Green;
-            
-            StatusForm.UpdateMessage(text, caption, color, 1500);
+            StatusForm.UpdateMessage(text, caption, GetColorFromCaption(caption), 1500);
             return DialogResult.OK;
         }
 
         public static DialogResult Show(string text, string caption, MessageBoxButtons buttons)
         {
-             return Show(text, caption);
+            if (buttons == MessageBoxButtons.OK)
+                return Show(text, caption);
+
+            return ShowDialog(null, text, caption, buttons, MessageBoxIcon.None);
         }
 
         public static DialogResult Show(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
         {
+            if (buttons != MessageBoxButtons.OK)
+                return ShowDialog(null, text, caption, buttons, icon);
+
             LogMessage(text, caption, icon);
             Color? color = GetColorFromIcon(icon);
             StatusForm.UpdateMessage(text, caption, color, 1500);
@@ -45,6 +44,9 @@ namespace StaadSteelApp
 
         public static DialogResult Show(IWin32Window owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
         {
+            if (buttons != MessageBoxButtons.OK)
+                return ShowDialog(owner, text, caption, buttons, icon);
+
             LogMessage(text, caption, icon);
             Color? color = GetColorFromIcon(icon);
             StatusForm.UpdateMessage(text, caption, color, 1500);
@@ -74,7 +76,7 @@ namespace StaadSteelApp
             AppLogger.Error(title + ": " + message);
             StatusForm.UpdateMessage(message, title, Color.Red, 1500);
         }
-        
+
         public static void ShowWarning(string message, string title = "Warning")
         {
             AppLogger.Warning(title + ": " + message);
@@ -107,7 +109,24 @@ namespace StaadSteelApp
 
             AppLogger.Info(message);
         }
-        
+
+        private static DialogResult ShowDialog(IWin32Window owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon)
+        {
+            LogMessage(text, caption, icon);
+            return owner == null
+                ? MessageBox.Show(text, caption, buttons, icon)
+                : MessageBox.Show(owner, text, caption, buttons, icon);
+        }
+
+        private static Color? GetColorFromCaption(string caption)
+        {
+            string safeCaption = caption ?? string.Empty;
+            if (safeCaption.IndexOf("Error", System.StringComparison.OrdinalIgnoreCase) >= 0) return Color.Red;
+            if (safeCaption.IndexOf("Warning", System.StringComparison.OrdinalIgnoreCase) >= 0) return Color.Goldenrod;
+            if (safeCaption.IndexOf("Success", System.StringComparison.OrdinalIgnoreCase) >= 0) return Color.Green;
+            return null;
+        }
+
         private static Color? GetColorFromIcon(MessageBoxIcon icon)
         {
             switch (icon)

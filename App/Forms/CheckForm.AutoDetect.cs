@@ -90,7 +90,7 @@ namespace StaadSteelApp
                     string msg = string.IsNullOrEmpty(selError)
                         ? "Please select beams in STAAD."
                         : "Could not read STAAD selection: " + selError;
-                    MessageBox.Show(msg, "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    TopMostMessageBox.ShowWarning(msg, "No Selection");
                 }
                 return;
             }
@@ -99,7 +99,7 @@ namespace StaadSteelApp
             if (_allForces.Count == 0)
             {
                 if (showMessage)
-                    MessageBox.Show("No forces found for selected beams.", "No Results", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    TopMostMessageBox.ShowWarning("No forces found for selected beams.", "No Results");
                 return;
             }
 

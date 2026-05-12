@@ -63,7 +63,7 @@ namespace StaadSteelApp
              }
              catch (Exception ex)
              {
-                MessageBox.Show("Error: " + ex.Message);
+                TopMostMessageBox.ShowError(ex.Message, "Check Error");
             }
             finally
             {
@@ -82,31 +82,35 @@ namespace StaadSteelApp
 
             if (!double.TryParse(txtTargetRatio.Text, out double targetRatio) || targetRatio <= 0 || targetRatio >= 1.5)
             {
-                MessageBox.Show("Target D/C must be a number between 0 and 1.5 (recommended <= 1.0).",
-                    "Invalid Target", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                TopMostMessageBox.ShowWarning(
+                    "Target D/C must be a number between 0 and 1.5 (recommended <= 1.0).",
+                    "Invalid Target");
                 return;
             }
 
             int memberNo = int.Parse(cboFrame.SelectedItem.ToString());
             if (!TryGetMemberSteelDesignResults(memberNo, out DesignResultInfo steelInfo))
             {
-                MessageBox.Show("Could not extract governing steel design result from STAAD for this member.",
-                    "Sizing Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                TopMostMessageBox.ShowWarning(
+                    "Could not extract governing steel design result from STAAD for this member.",
+                    "Sizing Error");
                 return;
             }
 
             var governingForce = GetCriticalSectionForces(memberNo, steelInfo);
             if (governingForce == null)
             {
-                MessageBox.Show("Could not extract critical-section forces for sizing.",
-                    "Sizing Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                TopMostMessageBox.ShowWarning(
+                    "Could not extract critical-section forces for sizing.",
+                    "Sizing Error");
                 return;
             }
 
              if (!TryGetTaperedSectionData(memberNo, out CheckTaperedSectionInfo currentTapered))
             {
-                MessageBox.Show("This sizing tool currently supports tapered/built-up sections only.",
-                    "Sizing Scope", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                TopMostMessageBox.ShowInfo(
+                    "This sizing tool currently supports tapered/built-up sections only.",
+                    "Sizing Scope");
                 return;
             }
 
@@ -133,7 +137,7 @@ namespace StaadSteelApp
 
             if (topFull.Count == 0 && topKeepDepth.Count == 0)
             {
-                 MessageBox.Show("Could not find any sizing solution within the Standard Geometry Limits.", "Sizing Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                 TopMostMessageBox.ShowWarning("Could not find any sizing solution within the Standard Geometry Limits.", "Sizing Failed");
                  return;
             }
 

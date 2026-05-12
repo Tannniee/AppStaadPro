@@ -61,7 +61,7 @@ namespace StaadSteelApp
             btnDiag.Click += (s, e) => {
                 string report = StaadSteelApp.AISC360.AISC360Verifier.RunVerification();
                 txtDetails.Text = report;
-                MessageBox.Show("Verification Completed. See Details pane.", "Diagnostics");
+                TopMostMessageBox.ShowSuccess("Verification completed. See Details pane.", "Diagnostics");
             };
             this.Controls.Add(btnDiag);
             btnDiag.BringToFront();

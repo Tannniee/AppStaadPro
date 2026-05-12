@@ -14,11 +14,9 @@ namespace StaadSteelApp
             if (!string.IsNullOrWhiteSpace(error))
                 Debug.WriteLine(error);
 
-            MessageBox.Show(
+            TopMostMessageBox.ShowError(
                 "Cannot connect to STAAD.Pro. Please ensure STAAD.Pro is running.",
-                "Connection Error",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
+                "Connection Error");
             return false;
         }
     }

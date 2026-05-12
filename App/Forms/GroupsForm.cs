@@ -265,7 +265,7 @@ namespace StaadSteelApp
                 return;
             }
 
-            DialogResult confirm = MessageBox.Show(
+            DialogResult confirm = TopMostMessageBox.Show(
                 this,
                 "Delete group '" + groupName + "'?",
                 "Groups",
