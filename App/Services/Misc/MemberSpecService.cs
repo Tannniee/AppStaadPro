@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using StaadSteelApp.Core.Interop;
@@ -7,6 +8,9 @@ namespace StaadSteelApp.Core.Misc
 {
     internal static class MemberSpecService
     {
+        private static readonly object _specCacheLock = new object();
+        private static readonly Dictionary<int, MiscMemberSpecType> _lastAppliedSpecByBeam = new Dictionary<int, MiscMemberSpecType>();
+
         internal static ServiceOperationResult ApplyMemberSpecSelected(MiscMemberSpecType specType)
         {
             if (!MiscOpenStaadService.TryGetProperty(out object propObj, out string propertyError))
@@ -37,6 +41,7 @@ namespace StaadSteelApp.Core.Misc
                 if (specType == MiscMemberSpecType.Normal)
                 {
                     int cleared = ClearMemberSpecs(propObj, beamIds, null, out string clearWarning);
+                    ClearCachedSpecs(beamIds);
                     if (!string.IsNullOrWhiteSpace(clearWarning))
                         Debug.WriteLine(clearWarning);
 
@@ -64,6 +69,7 @@ namespace StaadSteelApp.Core.Misc
                     return ServiceOperationResult.Error("Member Spec", "Assign member spec failed: " + assignError);
                 }
 
+                CacheSpecForBeams(beamIds, specType);
                 return ServiceOperationResult.Success(
                     "Member Spec",
                     $"{GetSpecTypeLabel(specType)} member spec applied to {beamCount} beams.");
@@ -86,33 +92,22 @@ namespace StaadSteelApp.Core.Misc
                 if (beam <= 0)
                     continue;
 
-                if (TryGetMemberSpecCode(propObj, beam, out int currentSpecCode, out string specError))
+                if (TryGetCachedSpecCode(beam, out int cachedSpecCode))
                 {
-                    if (keepSpecType.HasValue && currentSpecCode == GetExpectedMemberSpecCode(keepSpecType.Value))
+                    if (keepSpecType.HasValue && cachedSpecCode == GetExpectedMemberSpecCode(keepSpecType.Value))
                     {
                         cleared++;
                         continue;
                     }
 
-                    if (TryRemoveMemberSpecByCode(propObj, beam, currentSpecCode, out string removeError))
+                    if (TryRemoveMemberSpecByCode(propObj, beam, cachedSpecCode, out string cachedRemoveError))
                     {
                         cleared++;
+                        RemoveCachedSpec(beam);
                         continue;
                     }
 
-                    warnings.AppendLine($"Beam {beam}: {removeError}");
-                    continue;
-                }
-
-                if (!string.IsNullOrWhiteSpace(specError))
-                {
-                    if (IsNoMemberSpecReadResult(specError))
-                    {
-                        cleared++;
-                        continue;
-                    }
-
-                    warnings.AppendLine($"Beam {beam}: current spec read failed ({specError}); using fallback clear.");
+                    warnings.AppendLine($"Beam {beam}: cached clear failed ({cachedRemoveError}); using fallback clear.");
                 }
 
                 bool ok = true;
@@ -124,17 +119,71 @@ namespace StaadSteelApp.Core.Misc
                     ok &= TryRemoveMemberSpec(propObj, "RemoveMemberCompressionSpecFromBeam", beam);
 
                 if (ok)
+                {
+                    RemoveCachedSpec(beam);
                     cleared++;
+                }
             }
 
             warningLog = warnings.ToString();
             return cleared;
         }
 
-        private static bool IsNoMemberSpecReadResult(string error)
+        private static void CacheSpecForBeams(int[] beams, MiscMemberSpecType specType)
         {
-            return !string.IsNullOrWhiteSpace(error)
-                && error.IndexOf("GetMemberSpecCode returned 0", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (beams == null || beams.Length == 0)
+                return;
+
+            lock (_specCacheLock)
+            {
+                foreach (int beam in beams)
+                {
+                    if (beam > 0)
+                        _lastAppliedSpecByBeam[beam] = specType;
+                }
+            }
+        }
+
+        private static void ClearCachedSpecs(int[] beams)
+        {
+            if (beams == null || beams.Length == 0)
+                return;
+
+            lock (_specCacheLock)
+            {
+                foreach (int beam in beams)
+                {
+                    if (beam > 0)
+                        _lastAppliedSpecByBeam.Remove(beam);
+                }
+            }
+        }
+
+        private static void RemoveCachedSpec(int beam)
+        {
+            if (beam <= 0)
+                return;
+
+            lock (_specCacheLock)
+            {
+                _lastAppliedSpecByBeam.Remove(beam);
+            }
+        }
+
+        private static bool TryGetCachedSpecCode(int beam, out int specCode)
+        {
+            specCode = -1;
+            if (beam <= 0)
+                return false;
+
+            lock (_specCacheLock)
+            {
+                if (!_lastAppliedSpecByBeam.TryGetValue(beam, out MiscMemberSpecType specType))
+                    return false;
+
+                specCode = GetExpectedMemberSpecCode(specType);
+                return specCode >= 0;
+            }
         }
 
         private static bool TryRemoveMemberSpecByCode(object propObj, int beam, int specCode, out string error)
@@ -175,14 +224,8 @@ namespace StaadSteelApp.Core.Misc
 
             if (IsAssignMemberSpecSuccess(bulkCode))
             {
-                if (DoAllBeamsHaveExpectedSpec(propObj, beams, specType, out string verifyError))
-                {
-                    errorLog = string.Empty;
-                    return true;
-                }
-
-                if (!string.IsNullOrWhiteSpace(verifyError))
-                    sb.AppendLine(verifyError);
+                errorLog = string.Empty;
+                return true;
             }
 
             sb.AppendLine("Bulk assign returned code " + bulkCode);
@@ -193,17 +236,13 @@ namespace StaadSteelApp.Core.Misc
                 try
                 {
                     int code = AssignMemberSpecToBeam(propObj, new[] { beam }, specId);
-                    string verifyError = string.Empty;
-                    bool verified = BeamHasExpectedSpec(propObj, beam, specType, out verifyError);
-
-                    if (IsAssignMemberSpecSuccess(code) && verified)
+                    if (IsAssignMemberSpecSuccess(code))
                     {
                         success++;
                         continue;
                     }
 
-                    string suffix = string.IsNullOrWhiteSpace(verifyError) ? string.Empty : $" ({verifyError})";
-                    sb.AppendLine($"Beam {beam}: return code {code}{suffix}");
+                    sb.AppendLine($"Beam {beam}: return code {code}");
                 }
                 catch (Exception ex)
                 {
@@ -218,58 +257,6 @@ namespace StaadSteelApp.Core.Misc
         private static bool IsAssignMemberSpecSuccess(int code)
         {
             return code == 0 || code == 1;
-        }
-
-        private static bool DoAllBeamsHaveExpectedSpec(object propObj, int[] beams, MiscMemberSpecType specType, out string errorLog)
-        {
-            var sb = new System.Text.StringBuilder();
-            foreach (int beam in beams)
-            {
-                if (BeamHasExpectedSpec(propObj, beam, specType, out string error))
-                    continue;
-
-                if (sb.Length > 0)
-                    sb.AppendLine();
-                sb.Append("Beam ").Append(beam).Append(": ").Append(error);
-            }
-
-            errorLog = sb.ToString();
-            return string.IsNullOrWhiteSpace(errorLog);
-        }
-
-        private static bool BeamHasExpectedSpec(object propObj, int beam, MiscMemberSpecType specType, out string error)
-        {
-            error = string.Empty;
-            if (!TryGetMemberSpecCode(propObj, beam, out int specCode, out string specError))
-            {
-                error = string.IsNullOrWhiteSpace(specError)
-                    ? "spec was not applied."
-                    : specError;
-                return false;
-            }
-
-            int expectedCode = GetExpectedMemberSpecCode(specType);
-            if (expectedCode < 0)
-            {
-                error = "unknown expected member spec type.";
-                return false;
-            }
-
-            if (specCode != expectedCode)
-            {
-                error = $"expected spec code {expectedCode}, actual {specCode}.";
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool TryGetMemberSpecCode(object propObj, int beam, out int specCode, out string error)
-        {
-            specCode = -999;
-            error = string.Empty;
-
-            return OpenStaadPropertyAdapter.TryGetMemberSpecCode(propObj, beam, out specCode, out error);
         }
 
         private static int GetExpectedMemberSpecCode(MiscMemberSpecType specType)

@@ -1,5 +1,7 @@
 using System;
 using System.Drawing;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using StaadSteelApp.Core;
 
@@ -9,6 +11,8 @@ namespace StaadSteelApp
     {
         private readonly CheckBox[] _startChecks = new CheckBox[6];
         private readonly CheckBox[] _endChecks = new CheckBox[6];
+        private Button[] _memberTypeButtons;
+        private bool _memberSpecBusy;
         private TextBox _txtAngle;
 
         private static readonly string[] DofLabels = { "FX", "FY", "FZ", "MX", "MY", "MZ" };
@@ -105,7 +109,7 @@ namespace StaadSteelApp
                 Location = new Point(20, 24),
                 Size = new Size(100, 26)
             };
-            btnNormal.Click += (s, e) => ServiceOperationResultPresenter.Show(MiscToolsService.ApplyNormalMemberSpecSelected());
+            btnNormal.Click += async (s, e) => await RunMemberSpecActionAsync("Applying Normal member spec...", MiscToolsService.ApplyNormalMemberSpecSelected);
 
             var btnTruss = new Button
             {
@@ -113,7 +117,7 @@ namespace StaadSteelApp
                 Location = new Point(140, 24),
                 Size = new Size(100, 26)
             };
-            btnTruss.Click += (s, e) => ServiceOperationResultPresenter.Show(MiscToolsService.ApplyTrussMemberSpecSelected());
+            btnTruss.Click += async (s, e) => await RunMemberSpecActionAsync("Applying Truss member spec...", MiscToolsService.ApplyTrussMemberSpecSelected);
 
             var btnTension = new Button
             {
@@ -121,7 +125,7 @@ namespace StaadSteelApp
                 Location = new Point(20, 56),
                 Size = new Size(100, 26)
             };
-            btnTension.Click += (s, e) => ServiceOperationResultPresenter.Show(MiscToolsService.ApplyTensionMemberSpecSelected());
+            btnTension.Click += async (s, e) => await RunMemberSpecActionAsync("Applying Tension member spec...", MiscToolsService.ApplyTensionMemberSpecSelected);
 
             var btnCompression = new Button
             {
@@ -129,7 +133,9 @@ namespace StaadSteelApp
                 Location = new Point(140, 56),
                 Size = new Size(100, 26)
             };
-            btnCompression.Click += (s, e) => ServiceOperationResultPresenter.Show(MiscToolsService.ApplyCompressionMemberSpecSelected());
+            btnCompression.Click += async (s, e) => await RunMemberSpecActionAsync("Applying Compression member spec...", MiscToolsService.ApplyCompressionMemberSpecSelected);
+
+            _memberTypeButtons = new[] { btnNormal, btnTruss, btnTension, btnCompression };
 
             grpMemberType.Controls.Add(btnNormal);
             grpMemberType.Controls.Add(btnTruss);
@@ -368,6 +374,66 @@ namespace StaadSteelApp
             if (e.KeyChar == '.' && !_txtAngle.Text.Contains(".")) return;
             if (e.KeyChar == ',' && !_txtAngle.Text.Contains(",")) return;
             e.Handled = true;
+        }
+
+        private async Task RunMemberSpecActionAsync(string statusText, Func<ServiceOperationResult> operation)
+        {
+            if (_memberSpecBusy)
+                return;
+
+            _memberSpecBusy = true;
+            SetMemberTypeButtonsEnabled(false);
+            Cursor = Cursors.AppStarting;
+            StatusForm.UpdateMessage(statusText, "Member Spec", Color.Blue, autoHideMs: 0);
+
+            try
+            {
+                ServiceOperationResult result = await RunStaThreadAsync(operation);
+                ServiceOperationResultPresenter.Show(result);
+            }
+            catch (Exception ex)
+            {
+                TopMostMessageBox.ShowError("Member spec failed: " + ex.Message, "Member Spec");
+            }
+            finally
+            {
+                Cursor = Cursors.Default;
+                SetMemberTypeButtonsEnabled(true);
+                _memberSpecBusy = false;
+            }
+        }
+
+        private static Task<ServiceOperationResult> RunStaThreadAsync(Func<ServiceOperationResult> operation)
+        {
+            var completion = new TaskCompletionSource<ServiceOperationResult>();
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    completion.SetResult(operation());
+                }
+                catch (Exception ex)
+                {
+                    completion.SetException(ex);
+                }
+            });
+
+            thread.IsBackground = true;
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            return completion.Task;
+        }
+
+        private void SetMemberTypeButtonsEnabled(bool enabled)
+        {
+            if (_memberTypeButtons == null)
+                return;
+
+            foreach (Button button in _memberTypeButtons)
+            {
+                if (button != null && !button.IsDisposed)
+                    button.Enabled = enabled;
+            }
         }
     }
 }
