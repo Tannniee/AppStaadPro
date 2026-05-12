@@ -47,7 +47,7 @@ namespace StaadSteelApp.Core
                      return SectionAssignmentResult.Error("Assignment Error", propertyError);
                  }
 
-                 bool assigned = TryAssignPropertyToMembers(propObj, arrBeams, propID, out string assignError);
+                 bool assigned = TryAssignPropertyToMembers(propObj, arrBeams, propID, out string assignError, out bool verified);
                  if (!assigned)
                  {
                      return SectionAssignmentResult.Error(
@@ -74,6 +74,18 @@ namespace StaadSteelApp.Core
                  }
                  
                  string msg = $"- {info.Name} (ID: {propID})\n- {arrBeams.Length} beams assigned\n- Material: {materialText}";
+                 if (!verified)
+                 {
+                     string warning = string.IsNullOrWhiteSpace(assignError)
+                         ? "STAAD accepted the assignment, but the app could not confirm the read-back immediately."
+                         : assignError;
+                     return SectionAssignmentResult.SuccessWarning(
+                         "Assignment Sent",
+                         msg + "\n- " + warning,
+                         propID,
+                         arrBeams.Length);
+                 }
+
                  return SectionAssignmentResult.Success("Successfully Assigned", msg, propID, arrBeams.Length);
              }
              catch (Exception ex)
@@ -130,9 +142,10 @@ namespace StaadSteelApp.Core
             return false;
         }
 
-        private static bool TryAssignPropertyToMembers(object propObj, int[] beams, int propID, out string error)
+        private static bool TryAssignPropertyToMembers(object propObj, int[] beams, int propID, out string error, out bool verified)
         {
             error = "";
+            verified = false;
             if (propObj == null || beams == null || beams.Length == 0 || propID <= 0)
             {
                 error = "Invalid assign input.";
@@ -140,11 +153,15 @@ namespace StaadSteelApp.Core
             }
 
             // First attempt: bulk assignment (faster)
-            if (!OpenStaadPropertyAdapter.TryAssignBeamProperty(propObj, beams, propID, out string bulkError))
+            bool bulkAccepted = OpenStaadPropertyAdapter.TryAssignBeamProperty(propObj, beams, propID, out string bulkError);
+            if (!bulkAccepted)
                 error = "Bulk AssignBeamProperty failed: " + bulkError;
 
-            if (VerifyAssignedProperty(propObj, beams, propID, attempts: 2, delayMs: 15, maxChecks: 3))
+            if (VerifyAssignedProperty(propObj, beams, propID, attempts: 4, delayMs: 50, maxChecks: 3))
+            {
+                verified = true;
                 return true;
+            }
 
             // Fallback: assign one-by-one for COM builds that reject array variants.
             int attempted = 0;
@@ -164,8 +181,17 @@ namespace StaadSteelApp.Core
             }
 
             int verifyChecks = beams.Length <= 12 ? beams.Length : 6;
-            if (attempted == beams.Length && VerifyAssignedProperty(propObj, beams, propID, attempts: 2, delayMs: 15, maxChecks: verifyChecks))
+            if (attempted == beams.Length && VerifyAssignedProperty(propObj, beams, propID, attempts: 4, delayMs: 50, maxChecks: verifyChecks))
+            {
+                verified = true;
                 return true;
+            }
+
+            if (bulkAccepted || attempted == beams.Length)
+            {
+                error = "STAAD accepted the section assignment command, but OpenSTAAD read-back did not confirm it immediately. If the member already shows the new section in STAAD, the assignment is valid; refresh Used Sections if the app display is stale.";
+                return true;
+            }
 
             if (string.IsNullOrWhiteSpace(error))
                 error = $"Assignment verification failed after processing {attempted}/{beams.Length} beams.";

@@ -35,6 +35,19 @@ namespace StaadSteelApp.Core
             return Create(false, SectionAssignmentResultKind.Warning, title, message);
         }
 
+        public static SectionAssignmentResult SuccessWarning(string title, string message, int propertyId, int beamCount)
+        {
+            return new SectionAssignmentResult
+            {
+                Succeeded = true,
+                Kind = SectionAssignmentResultKind.Warning,
+                Title = title,
+                Message = message,
+                PropertyId = propertyId,
+                BeamCount = beamCount
+            };
+        }
+
         public static SectionAssignmentResult Error(string title, string message)
         {
             return Create(false, SectionAssignmentResultKind.Error, title, message);
