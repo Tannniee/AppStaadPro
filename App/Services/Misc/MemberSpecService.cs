@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Text;
 using StaadSteelApp.Core.Interop;
 
 namespace StaadSteelApp.Core.Misc
@@ -35,16 +36,9 @@ namespace StaadSteelApp.Core.Misc
             {
                 if (specType == MiscMemberSpecType.Normal)
                 {
-                    int cleared = 0;
-                    foreach (int beam in beamIds)
-                    {
-                        bool ok = true;
-                        ok &= TryRemoveMemberSpec(propObj, "RemoveMemberTrussSpecFromBeam", beam);
-                        ok &= TryRemoveMemberSpec(propObj, "RemoveMemberTensionSpecFromBeam", beam);
-                        ok &= TryRemoveMemberSpec(propObj, "RemoveMemberCompressionSpecFromBeam", beam);
-                        if (ok)
-                            cleared++;
-                    }
+                    int cleared = ClearMemberSpecs(propObj, beamIds, null, out string clearWarning);
+                    if (!string.IsNullOrWhiteSpace(clearWarning))
+                        Debug.WriteLine(clearWarning);
 
                     return ServiceOperationResult.Success(
                         "Member Spec",
@@ -61,15 +55,9 @@ namespace StaadSteelApp.Core.Misc
                     return ServiceOperationResult.Error("Member Spec", message);
                 }
 
-                foreach (int beam in beamIds)
-                {
-                    if (specType != MiscMemberSpecType.Truss)
-                        TryRemoveMemberSpec(propObj, "RemoveMemberTrussSpecFromBeam", beam);
-                    if (specType != MiscMemberSpecType.Tension)
-                        TryRemoveMemberSpec(propObj, "RemoveMemberTensionSpecFromBeam", beam);
-                    if (specType != MiscMemberSpecType.Compression)
-                        TryRemoveMemberSpec(propObj, "RemoveMemberCompressionSpecFromBeam", beam);
-                }
+                ClearMemberSpecs(propObj, beamIds, specType, out string clearConflictsWarning);
+                if (!string.IsNullOrWhiteSpace(clearConflictsWarning))
+                    Debug.WriteLine(clearConflictsWarning);
 
                 if (!TryAssignMemberSpec(propObj, beamIds, specId, specType, out string assignError))
                 {
@@ -86,6 +74,84 @@ namespace StaadSteelApp.Core.Misc
                 AppLogger.Exception("Member spec failed.", ex);
                 return ServiceOperationResult.Error("Member Spec", "Member spec failed: " + ex.Message);
             }
+        }
+
+        private static int ClearMemberSpecs(object propObj, int[] beams, MiscMemberSpecType? keepSpecType, out string warningLog)
+        {
+            var warnings = new StringBuilder();
+            int cleared = 0;
+
+            foreach (int beam in beams)
+            {
+                if (beam <= 0)
+                    continue;
+
+                if (TryGetMemberSpecCode(propObj, beam, out int currentSpecCode, out string specError))
+                {
+                    if (keepSpecType.HasValue && currentSpecCode == GetExpectedMemberSpecCode(keepSpecType.Value))
+                    {
+                        cleared++;
+                        continue;
+                    }
+
+                    if (TryRemoveMemberSpecByCode(propObj, beam, currentSpecCode, out string removeError))
+                    {
+                        cleared++;
+                        continue;
+                    }
+
+                    warnings.AppendLine($"Beam {beam}: {removeError}");
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(specError))
+                {
+                    if (IsNoMemberSpecReadResult(specError))
+                    {
+                        cleared++;
+                        continue;
+                    }
+
+                    warnings.AppendLine($"Beam {beam}: current spec read failed ({specError}); using fallback clear.");
+                }
+
+                bool ok = true;
+                if (!keepSpecType.HasValue || keepSpecType.Value != MiscMemberSpecType.Truss)
+                    ok &= TryRemoveMemberSpec(propObj, "RemoveMemberTrussSpecFromBeam", beam);
+                if (!keepSpecType.HasValue || keepSpecType.Value != MiscMemberSpecType.Tension)
+                    ok &= TryRemoveMemberSpec(propObj, "RemoveMemberTensionSpecFromBeam", beam);
+                if (!keepSpecType.HasValue || keepSpecType.Value != MiscMemberSpecType.Compression)
+                    ok &= TryRemoveMemberSpec(propObj, "RemoveMemberCompressionSpecFromBeam", beam);
+
+                if (ok)
+                    cleared++;
+            }
+
+            warningLog = warnings.ToString();
+            return cleared;
+        }
+
+        private static bool IsNoMemberSpecReadResult(string error)
+        {
+            return !string.IsNullOrWhiteSpace(error)
+                && error.IndexOf("GetMemberSpecCode returned 0", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool TryRemoveMemberSpecByCode(object propObj, int beam, int specCode, out string error)
+        {
+            error = string.Empty;
+            string methodName = GetRemoveMethodName(specCode);
+            if (string.IsNullOrWhiteSpace(methodName))
+            {
+                error = $"unknown member spec code {specCode}.";
+                return false;
+            }
+
+            if (TryRemoveMemberSpec(propObj, methodName, beam))
+                return true;
+
+            error = $"{methodName} failed.";
+            return false;
         }
 
         private static int AssignMemberSpecToBeam(object propObj, int[] beams, int specId)
@@ -231,6 +297,21 @@ namespace StaadSteelApp.Core.Misc
                     return "CreateMemberTensionSpec";
                 case MiscMemberSpecType.Compression:
                     return "CreateMemberCompressionSpec";
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static string GetRemoveMethodName(int specCode)
+        {
+            switch (specCode)
+            {
+                case 0:
+                    return "RemoveMemberTrussSpecFromBeam";
+                case 1:
+                    return "RemoveMemberTensionSpecFromBeam";
+                case 2:
+                    return "RemoveMemberCompressionSpecFromBeam";
                 default:
                     return string.Empty;
             }
