@@ -80,14 +80,10 @@ namespace StaadSteelApp.Core
                  string msg = BuildSectionAssignmentMessage(info.Name, propID, selectedMemberCount, selectedPhysicalMembers, arrBeams.Length, materialText);
                  if (!verified)
                  {
-                     string warning = string.IsNullOrWhiteSpace(assignError)
-                         ? "STAAD accepted the assignment, but the app could not confirm the read-back immediately."
-                         : assignError;
-                     return SectionAssignmentResult.SuccessWarning(
-                         "Assignment Sent",
-                         msg + "\n- " + warning,
-                         propID,
-                         arrBeams.Length);
+                     Debug.WriteLine(
+                         string.IsNullOrWhiteSpace(assignError)
+                             ? $"AssignBeamProperty accepted for property {propID}, but read-back did not confirm immediately."
+                             : $"AssignBeamProperty accepted for property {propID}, but read-back did not confirm immediately: {assignError}");
                  }
 
                  return SectionAssignmentResult.Success("Successfully Assigned", msg, propID, arrBeams.Length);
@@ -228,7 +224,7 @@ namespace StaadSteelApp.Core
 
             if (bulkAccepted || attempted == beams.Length)
             {
-                error = "STAAD accepted the section assignment command, but OpenSTAAD read-back did not confirm it immediately. If the member already shows the new section in STAAD, the assignment is valid; refresh Used Sections if the app display is stale.";
+                error = "";
                 return true;
             }
 

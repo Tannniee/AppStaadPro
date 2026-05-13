@@ -249,6 +249,32 @@ namespace StaadSteelApp.Core.Interop
             return true;
         }
 
+        internal static bool TryRenumberBeam(object geometry, int oldBeamId, int newBeamId, out string error)
+        {
+            error = string.Empty;
+
+            if (geometry == null)
+            {
+                error = "OpenSTAAD Geometry object is not available.";
+                return false;
+            }
+
+            if (oldBeamId <= 0 || newBeamId <= 0)
+            {
+                error = $"Invalid renumber pair {oldBeamId} -> {newBeamId}.";
+                return false;
+            }
+
+            if (!ComInvoke.TryInvoke(geometry, "RenumberBeam", out object result, out error, new object[] { oldBeamId, newBeamId }))
+                return false;
+
+            if (ComResult.IsTrue(result))
+                return true;
+
+            error = $"RenumberBeam returned '{result ?? "null"}' for {oldBeamId} -> {newBeamId}.";
+            return false;
+        }
+
         internal static bool TryClearMemberSelection(object geometry, out string error)
         {
             return TryClearSelection(geometry, "ClearMemberSelection", out error);

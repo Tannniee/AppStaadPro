@@ -31,13 +31,19 @@ namespace StaadSteelApp.Core.Interop
         internal static bool TryAssignBeamProperty(object propertyObj, int[] beamIds, int propertyRefNo, out string error)
         {
             error = string.Empty;
-            return ComInvoke.TryInvoke(propertyObj, "AssignBeamProperty", out _, out error, new object[] { beamIds, propertyRefNo });
+            if (!ComInvoke.TryInvoke(propertyObj, "AssignBeamProperty", out object result, out error, new object[] { beamIds, propertyRefNo }))
+                return false;
+
+            return IsZeroStatusSuccess(result, out error);
         }
 
         internal static bool TryAssignBeamProperty(object propertyObj, int beamId, int propertyRefNo, out string error)
         {
             error = string.Empty;
-            return ComInvoke.TryInvoke(propertyObj, "AssignBeamProperty", out _, out error, new object[] { beamId, propertyRefNo });
+            if (!ComInvoke.TryInvoke(propertyObj, "AssignBeamProperty", out object result, out error, new object[] { beamId, propertyRefNo }))
+                return false;
+
+            return IsZeroStatusSuccess(result, out error);
         }
     }
 }

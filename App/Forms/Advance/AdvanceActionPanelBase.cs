@@ -14,6 +14,7 @@ namespace StaadSteelApp
 
         public abstract string ActionText { get; }
         public abstract string ApplyText { get; }
+        public virtual bool UsesNodeSelection => true;
         public Control View => this;
 
         protected AdvanceActionPanelBase()

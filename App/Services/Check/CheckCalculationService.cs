@@ -36,7 +36,6 @@ namespace StaadSteelApp.Core.Check
 
             var mapper = new StaadToAiscMapper(request.OpenStaad);
             IReadOnlyList<MemberForceData> allForces = request.AllForces ?? Array.Empty<MemberForceData>();
-            List<MemberForceData> memberForces = allForces.Where(f => f.MemberNo == request.MemberNo).ToList();
 
             DesignResults worstResults = null;
             double maxRatio = -1.0;
@@ -64,6 +63,7 @@ namespace StaadSteelApp.Core.Check
             else
             {
                 result.ManualSource = "Extracted analysis envelope scan";
+                List<MemberForceData> memberForces = allForces.Where(f => f.MemberNo == request.MemberNo).ToList();
                 foreach (MemberForceData force in memberForces)
                 {
                     AnalyzedMember analyzedMember = MapMember(mapper, request.OpenStaad, force, request.IsBuiltUp);

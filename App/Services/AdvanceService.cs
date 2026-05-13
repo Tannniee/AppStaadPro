@@ -114,6 +114,36 @@ namespace StaadSteelApp.Core
             return AdvanceSelectionService.GetCoordinateLengthUnitLabel();
         }
 
+        public static bool TryPreviewLegacyPipeTubeUptConversion(
+            out AdvanceUptConversionPreview preview,
+            out string message)
+        {
+            return AdvanceConvertUptService.TryPreviewLegacyPipeTubeConversion(out preview, out message);
+        }
+
+        public static bool TryConvertLegacyPipeTubeToUpt(
+            AdvanceUptConversionPreview preview,
+            out int convertedMemberCount,
+            out string message)
+        {
+            return AdvanceConvertUptService.TryConvertLegacyPipeTubeToUpt(preview, out convertedMemberCount, out message);
+        }
+
+        public static bool TryPreviewSectionMerge(
+            out AdvanceSectionMergePreview preview,
+            out string message)
+        {
+            return AdvanceSectionMergeService.TryPreviewSectionMerge(out preview, out message);
+        }
+
+        public static bool TryMergeDuplicateSections(
+            AdvanceSectionMergePreview preview,
+            out int mergedMemberCount,
+            out string message)
+        {
+            return AdvanceSectionMergeService.TryMergeDuplicateSections(preview, out mergedMemberCount, out message);
+        }
+
         public static bool TryCreateAlignedNodeFromThreeNodes(
             int lineNodeA,
             int lineNodeB,

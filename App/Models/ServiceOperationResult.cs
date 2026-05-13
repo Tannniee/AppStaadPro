@@ -8,7 +8,15 @@ namespace StaadSteelApp.Core
         Error
     }
 
-    public sealed class ServiceOperationResult
+    public interface IOperationResult
+    {
+        bool Succeeded { get; }
+        ServiceOperationResultKind Kind { get; }
+        string Title { get; }
+        string Message { get; }
+    }
+
+    public sealed class ServiceOperationResult : IOperationResult
     {
         public bool Succeeded { get; set; }
         public ServiceOperationResultKind Kind { get; set; }

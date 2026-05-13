@@ -50,6 +50,11 @@ namespace StaadSteelApp.Core
             return MemberIdClipboardService.CopySelectedMemberIds(out clipboardText);
         }
 
+        public static ServiceOperationResult RenumberMembersByPropertyRef()
+        {
+            return MemberRenumberService.RenumberMembersByPropertyRef();
+        }
+
         public static ServiceOperationResult ResetDefaultSelected()
         {
             return MemberReleaseService.ResetDefaultSelected();

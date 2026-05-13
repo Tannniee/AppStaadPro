@@ -30,6 +30,17 @@ namespace StaadSteelApp
                     IsBuiltUp = chkIsBuiltUp.Checked
                 });
 
+                if (calculation.Results == null && EnsureForcesForMember(memberNo))
+                {
+                    calculation = CheckCalculationService.Calculate(new CheckCalculationRequest
+                    {
+                        OpenStaad = _os,
+                        MemberNo = memberNo,
+                        AllForces = _allForces,
+                        IsBuiltUp = chkIsBuiltUp.Checked
+                    });
+                }
+
                 _currentResults = calculation.Results;
                 _currentSteelInfo = ToFormDesignResult(calculation.SteelInfo);
                 _currentGoverningForce = calculation.GoverningForce;

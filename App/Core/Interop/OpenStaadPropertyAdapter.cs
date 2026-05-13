@@ -47,6 +47,29 @@ namespace StaadSteelApp.Core.Interop
             return ComResult.TryToDouble(result, out double number) && Math.Abs(number) > 0.0001;
         }
 
+        private static bool IsZeroStatusSuccess(object result, out string error)
+        {
+            error = string.Empty;
+
+            if (result == null)
+                return true;
+
+            if (result is bool)
+                return true;
+
+            if (ComResult.TryToInt32(result, out int code))
+            {
+                if (code == 0)
+                    return true;
+
+                error = $"OpenSTAAD returned status {code}.";
+                return false;
+            }
+
+            error = $"OpenSTAAD returned unexpected status '{result}'.";
+            return false;
+        }
+
         private static int InvokeInt(object target, string methodName, out string error, params object[] args)
         {
             error = string.Empty;

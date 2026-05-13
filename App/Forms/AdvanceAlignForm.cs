@@ -16,6 +16,9 @@ namespace StaadSteelApp
         private readonly List<IAdvanceActionPanel> _actionPanels = new List<IAdvanceActionPanel>();
         private readonly AdvanceActionContext _actionContext;
         private Panel _panelActionHost;
+        private Point _actionLocationWithSelection;
+        private Point _actionLocationWithoutSelection;
+        private Size _actionSizeWithSelection;
         private int[] _selectedNodes = Array.Empty<int>();
 
         public AdvanceAlignForm()
@@ -31,6 +34,8 @@ namespace StaadSteelApp
 
             RegisterActionPanels();
             InitializeActionHost();
+            CaptureAdaptiveLayout();
+            SelectDefaultAction();
 
             _selectionSyncTimer = new Timer { Interval = 400 };
             _selectionSyncTimer.Tick += SelectionSyncTimer_Tick;
@@ -49,6 +54,8 @@ namespace StaadSteelApp
             _actionPanels.Add(new FrameRotatePanel());
             _actionPanels.Add(new BeamVectorNodePanel());
             _actionPanels.Add(new BeamPlanePanel());
+            _actionPanels.Add(new ConvertUptPanel());
+            _actionPanels.Add(new MergeSectionsPanel());
         }
 
         private void InitializeActionHost()
@@ -73,6 +80,10 @@ namespace StaadSteelApp
                 _cboAction.Items.Add(panel.ActionText);
             }
 
+        }
+
+        private void SelectDefaultAction()
+        {
             if (_cboAction.Items.Count > 0)
                 _cboAction.SelectedIndex = 0;
         }
@@ -182,8 +193,43 @@ namespace StaadSteelApp
             foreach (IAdvanceActionPanel panel in _actionPanels)
                 panel.View.Visible = ReferenceEquals(panel, current);
 
+            ApplySelectionPanelLayout(current.UsesNodeSelection);
+            current.View.BringToFront();
             _btnApply.Text = current.ApplyText;
             UpdateHint();
+        }
+
+        private void CaptureAdaptiveLayout()
+        {
+            _actionLocationWithSelection = _grpAction.Location;
+            _actionSizeWithSelection = _grpAction.Size;
+            _actionLocationWithoutSelection = _grpSelection.Location;
+        }
+
+        private void ApplySelectionPanelLayout(bool usesNodeSelection)
+        {
+            _grpSelection.Visible = usesNodeSelection;
+            _grpAction.Location = usesNodeSelection ? _actionLocationWithSelection : _actionLocationWithoutSelection;
+            _grpAction.Size = _actionSizeWithSelection;
+            _grpAction.Visible = true;
+
+            if (_panelActionHost != null)
+            {
+                _panelActionHost.Location = new Point(10, 24);
+                _panelActionHost.Size = new Size(_grpAction.ClientSize.Width - 20, _grpAction.ClientSize.Height - 34);
+                _panelActionHost.Visible = true;
+                _panelActionHost.BringToFront();
+            }
+
+            if (usesNodeSelection)
+            {
+                _grpSelection.BringToFront();
+                SyncSelection(showErrors: false, forceRefresh: true);
+            }
+            else
+            {
+                _grpAction.BringToFront();
+            }
         }
 
         private void UpdateHint()
@@ -236,6 +282,10 @@ namespace StaadSteelApp
         private void SelectionSyncTimer_Tick(object sender, EventArgs e)
         {
             if (!Visible || IsDisposed)
+                return;
+
+            IAdvanceActionPanel current = GetCurrentActionPanel();
+            if (current != null && !current.UsesNodeSelection)
                 return;
 
             SyncSelection(showErrors: false);

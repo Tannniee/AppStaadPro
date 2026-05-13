@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using StaadSteelApp.Core;
@@ -13,6 +12,7 @@ namespace StaadSteelApp
         private readonly CheckBox[] _endChecks = new CheckBox[6];
         private Button[] _memberTypeButtons;
         private bool _memberSpecBusy;
+        private bool _renumberBusy;
         private TextBox _txtAngle;
 
         private static readonly string[] DofLabels = { "FX", "FY", "FZ", "MX", "MY", "MZ" };
@@ -27,6 +27,15 @@ namespace StaadSteelApp
             ClientSize = new Size(284, 552);
             TopMost = true;
 
+            Controls.Add(BuildReleasesGroup());
+            Controls.Add(BuildLocalAxesGroup());
+            Controls.Add(BuildMemberTypeGroup());
+            Controls.Add(BuildSupportGroup());
+            Controls.Add(BuildMemberIdsGroup());
+        }
+
+        private GroupBox BuildReleasesGroup()
+        {
             var grpReleases = new GroupBox
             {
                 Text = "Frame Releases",
@@ -62,6 +71,11 @@ namespace StaadSteelApp
             grpReleases.Controls.Add(btnReset);
             grpReleases.Controls.Add(btnApplyReleases);
 
+            return grpReleases;
+        }
+
+        private GroupBox BuildLocalAxesGroup()
+        {
             var grpLocalAxes = new GroupBox
             {
                 Text = "Local Axes",
@@ -96,6 +110,11 @@ namespace StaadSteelApp
             grpLocalAxes.Controls.Add(_txtAngle);
             grpLocalAxes.Controls.Add(btnRotate);
 
+            return grpLocalAxes;
+        }
+
+        private GroupBox BuildMemberTypeGroup()
+        {
             var grpMemberType = new GroupBox
             {
                 Text = "Member Type",
@@ -142,6 +161,11 @@ namespace StaadSteelApp
             grpMemberType.Controls.Add(btnTension);
             grpMemberType.Controls.Add(btnCompression);
 
+            return grpMemberType;
+        }
+
+        private GroupBox BuildSupportGroup()
+        {
             var grpSupport = new GroupBox
             {
                 Text = "Support",
@@ -186,6 +210,11 @@ namespace StaadSteelApp
             grpSupport.Controls.Add(btnFixedBut);
             grpSupport.Controls.Add(btnNone);
 
+            return grpSupport;
+        }
+
+        private GroupBox BuildMemberIdsGroup()
+        {
             var grpMemberIds = new GroupBox
             {
                 Text = "Member IDs",
@@ -193,21 +222,26 @@ namespace StaadSteelApp
                 Size = new Size(260, 55)
             };
 
+            var btnRenumber = new Button
+            {
+                Text = "Renumber",
+                Location = new Point(20, 20),
+                Size = new Size(100, 26)
+            };
+            btnRenumber.Click += async (s, e) => await RenumberMembersAsync();
+
             var btnIdMember = new Button
             {
                 Text = "ID MEMBER",
-                Location = new Point(20, 20),
-                Size = new Size(220, 26)
+                Location = new Point(140, 20),
+                Size = new Size(100, 26)
             };
             btnIdMember.Click += (s, e) => CopySelectedMemberIds();
 
+            grpMemberIds.Controls.Add(btnRenumber);
             grpMemberIds.Controls.Add(btnIdMember);
 
-            Controls.Add(grpReleases);
-            Controls.Add(grpLocalAxes);
-            Controls.Add(grpMemberType);
-            Controls.Add(grpSupport);
-            Controls.Add(grpMemberIds);
+            return grpMemberIds;
         }
 
         private TableLayoutPanel BuildReleasesTable()
@@ -350,6 +384,31 @@ namespace StaadSteelApp
             }
         }
 
+        private async Task RenumberMembersAsync()
+        {
+            if (_renumberBusy)
+                return;
+
+            DialogResult confirm = TopMostMessageBox.Show(
+                this,
+                "Renumber all analytical members by property Ref ID?\nThis changes member numbers in STAAD.",
+                "Renumber",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (confirm != DialogResult.Yes)
+                return;
+
+            await FormOperationRunner.RunStaThreadAsync(
+                this,
+                () => _renumberBusy,
+                value => _renumberBusy = value,
+                "Renumber",
+                "Renumbering members by property Ref ID...",
+                MiscToolsService.RenumberMembersByPropertyRef,
+                "Error renumbering members: ");
+        }
+
         private static int[] ReadChecks(CheckBox[] checks)
         {
             var arr = new int[6];
@@ -381,47 +440,15 @@ namespace StaadSteelApp
             if (_memberSpecBusy)
                 return;
 
-            _memberSpecBusy = true;
-            SetMemberTypeButtonsEnabled(false);
-            Cursor = Cursors.AppStarting;
-            StatusForm.UpdateMessage(statusText, "Member Spec", Color.Blue, autoHideMs: 0);
-
-            try
-            {
-                ServiceOperationResult result = await RunStaThreadAsync(operation);
-                ServiceOperationResultPresenter.Show(result);
-            }
-            catch (Exception ex)
-            {
-                TopMostMessageBox.ShowError("Member spec failed: " + ex.Message, "Member Spec");
-            }
-            finally
-            {
-                Cursor = Cursors.Default;
-                SetMemberTypeButtonsEnabled(true);
-                _memberSpecBusy = false;
-            }
-        }
-
-        private static Task<ServiceOperationResult> RunStaThreadAsync(Func<ServiceOperationResult> operation)
-        {
-            var completion = new TaskCompletionSource<ServiceOperationResult>();
-            var thread = new Thread(() =>
-            {
-                try
-                {
-                    completion.SetResult(operation());
-                }
-                catch (Exception ex)
-                {
-                    completion.SetException(ex);
-                }
-            });
-
-            thread.IsBackground = true;
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            return completion.Task;
+            await FormOperationRunner.RunStaThreadAsync(
+                this,
+                () => _memberSpecBusy,
+                value => _memberSpecBusy = value,
+                "Member Spec",
+                statusText,
+                operation,
+                "Member spec failed: ",
+                SetMemberTypeButtonsEnabled);
         }
 
         private void SetMemberTypeButtonsEnabled(bool enabled)

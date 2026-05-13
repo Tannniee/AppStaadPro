@@ -26,6 +26,22 @@ namespace StaadSteelApp.Core
             }
         }
 
+        public static List<UsedSectionEntry> GetUsedSections(object os, bool forceRefresh)
+        {
+            if (os == null)
+                return new List<UsedSectionEntry>();
+
+            lock (_usedSectionsCacheSync)
+            {
+                if (forceRefresh)
+                    RebuildUsedSectionsCache(os, GetUsedSectionsModelKey(os));
+                else
+                    EnsureUsedSectionsCache(os);
+
+                return BuildUsedSectionsListFromCache();
+            }
+        }
+
         public static void UpdateUsedSectionsCacheAfterAssignment(object os, IEnumerable<int> beamIds, int targetPropertyId)
         {
             if (os == null || targetPropertyId <= 0)

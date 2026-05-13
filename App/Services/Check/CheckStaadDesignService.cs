@@ -128,13 +128,17 @@ namespace StaadSteelApp.Core.Check
             object openStaad,
             int memberNo,
             IReadOnlyList<MemberForceData> extractedEndForces,
-            int stationCount = 21)
+            int stationCount = 21,
+            bool sampleIntermediate = false)
         {
-            List<CheckForceEnvelopeEntry> sampled = TrySampleMemberForceEnvelope(openStaad, memberNo, stationCount);
-            if (sampled.Count > 0)
-                return sampled;
+            List<CheckForceEnvelopeEntry> extracted = BuildEnvelopeFromExtractedEndForces(memberNo, extractedEndForces);
+            if (extracted.Count > 0)
+                return extracted;
 
-            return BuildEnvelopeFromExtractedEndForces(memberNo, extractedEndForces);
+            if (!sampleIntermediate)
+                return extracted;
+
+            return TrySampleMemberForceEnvelope(openStaad, memberNo, stationCount);
         }
 
         private static List<CheckForceEnvelopeEntry> TrySampleMemberForceEnvelope(object openStaad, int memberNo, int stationCount)

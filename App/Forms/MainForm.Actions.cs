@@ -103,43 +103,39 @@ namespace StaadSteelApp
             {
                 if (!TryGetMainOpenStaad(out object openStaad)) return;
 
-                CheckPreparationResult preparation = CheckForceExtractionService.PrepareSelectedMemberEndForces(
-                    openStaad,
-                    selectedBeamCount => StatusForm.UpdateMessage(
-                        $"Extracting forces for {selectedBeamCount} beams...",
-                        "CHECK",
-                        Color.Blue,
-                        0));
-                if (!preparation.CanOpenCheckForm)
+                if (!CheckForceExtractionService.TryGetSelectedBeamIds(
+                        openStaad,
+                        out int[] selectedBeams,
+                        out string selectionError))
                 {
-                    ShowCheckPreparationMessage(preparation);
+                    TopMostMessageBox.ShowError("Could not read selected beams: " + selectionError, "Check");
                     return;
                 }
 
-                // CheckForm owns interactive recalculation after force extraction.
+                if (selectedBeams.Length == 0)
+                {
+                    TopMostMessageBox.ShowInfo("No beams selected in STAAD.", "Check");
+                    return;
+                }
 
-                StatusForm.UpdateMessage("Extraction complete. Opening Check Form...", "CHECK", Color.Green, 1000);
+                StatusForm.UpdateMessage(
+                    $"Opening Check for {selectedBeams.Length} selected beam(s)...",
+                    "CHECK",
+                    Color.Blue,
+                    1000);
+
+                // CheckForm loads forces lazily for the active member instead of scanning
+                // every selected member before the window can open.
 
                 CheckForm form = new CheckForm();
 
-                form.LoadData(new List<MemberForceData>(preparation.Extraction.Forces), openStaad);
+                form.LoadMembers(selectedBeams, openStaad);
                 form.Show();
             }
             catch (Exception ex)
             {
                 TopMostMessageBox.ShowError("Check Error: " + ex.Message);
             }
-        }
-
-        private void ShowCheckPreparationMessage(CheckPreparationResult preparation)
-        {
-            if (preparation == null || string.IsNullOrWhiteSpace(preparation.UserMessage))
-                return;
-
-            if (preparation.MessageKind == CheckPreparationMessageKind.Error)
-                TopMostMessageBox.ShowError(preparation.UserMessage, "Check");
-            else
-                TopMostMessageBox.ShowInfo(preparation.UserMessage, "Check");
         }
 
         private void btnRun_Click(object sender, EventArgs e)

@@ -1,17 +1,9 @@
 namespace StaadSteelApp.Core
 {
-    public enum SectionAssignmentResultKind
-    {
-        Success,
-        Info,
-        Warning,
-        Error
-    }
-
-    public sealed class SectionAssignmentResult
+    public sealed class SectionAssignmentResult : IOperationResult
     {
         public bool Succeeded { get; set; }
-        public SectionAssignmentResultKind Kind { get; set; }
+        public ServiceOperationResultKind Kind { get; set; }
         public string Title { get; set; }
         public string Message { get; set; }
         public int PropertyId { get; set; }
@@ -22,7 +14,7 @@ namespace StaadSteelApp.Core
             return new SectionAssignmentResult
             {
                 Succeeded = true,
-                Kind = SectionAssignmentResultKind.Success,
+                Kind = ServiceOperationResultKind.Success,
                 Title = title,
                 Message = message,
                 PropertyId = propertyId,
@@ -32,7 +24,7 @@ namespace StaadSteelApp.Core
 
         public static SectionAssignmentResult Warning(string title, string message)
         {
-            return Create(false, SectionAssignmentResultKind.Warning, title, message);
+            return Create(false, ServiceOperationResultKind.Warning, title, message);
         }
 
         public static SectionAssignmentResult SuccessWarning(string title, string message, int propertyId, int beamCount)
@@ -40,7 +32,7 @@ namespace StaadSteelApp.Core
             return new SectionAssignmentResult
             {
                 Succeeded = true,
-                Kind = SectionAssignmentResultKind.Warning,
+                Kind = ServiceOperationResultKind.Warning,
                 Title = title,
                 Message = message,
                 PropertyId = propertyId,
@@ -50,10 +42,10 @@ namespace StaadSteelApp.Core
 
         public static SectionAssignmentResult Error(string title, string message)
         {
-            return Create(false, SectionAssignmentResultKind.Error, title, message);
+            return Create(false, ServiceOperationResultKind.Error, title, message);
         }
 
-        private static SectionAssignmentResult Create(bool succeeded, SectionAssignmentResultKind kind, string title, string message)
+        private static SectionAssignmentResult Create(bool succeeded, ServiceOperationResultKind kind, string title, string message)
         {
             return new SectionAssignmentResult
             {

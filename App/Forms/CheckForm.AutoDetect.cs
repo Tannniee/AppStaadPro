@@ -49,12 +49,8 @@ namespace StaadSteelApp
         {
             try
             {
-                _allForces = ExtractForcesForBeams(selectedBeams);
-                if (_allForces.Count == 0)
-                {
-                    lblCompare.Text = "No forces found for selection.";
-                    return;
-                }
+                if (_allForces == null)
+                    _allForces = new List<MemberForceData>();
 
                 cboFrame.SelectedIndexChanged -= cboFrame_SelectedIndexChanged;
                 cboFrame.Items.Clear();
@@ -95,13 +91,8 @@ namespace StaadSteelApp
                 return;
             }
 
-            _allForces = ExtractForcesForBeams(selectedBeams);
-            if (_allForces.Count == 0)
-            {
-                if (showMessage)
-                    TopMostMessageBox.ShowWarning("No forces found for selected beams.", "No Results");
-                return;
-            }
+            if (_allForces == null)
+                _allForces = new List<MemberForceData>();
 
             cboFrame.SelectedIndexChanged -= cboFrame_SelectedIndexChanged;
             cboFrame.Items.Clear();
@@ -117,6 +108,31 @@ namespace StaadSteelApp
                 UpdateBuiltUpOption(selectedBeams[0]);
 
             PerformCalculation();
+        }
+
+        private bool HasForcesForMember(int memberNo)
+        {
+            return _allForces != null && _allForces.Any(f => f.MemberNo == memberNo);
+        }
+
+        private bool EnsureForcesForMember(int memberNo)
+        {
+            if (memberNo <= 0)
+                return false;
+
+            if (HasForcesForMember(memberNo))
+                return true;
+
+            List<MemberForceData> memberForces = ExtractForcesForBeams(new[] { memberNo });
+            if (memberForces.Count == 0)
+                return false;
+
+            if (_allForces == null)
+                _allForces = new List<MemberForceData>();
+
+            _allForces.RemoveAll(f => f.MemberNo == memberNo);
+            _allForces.AddRange(memberForces);
+            return true;
         }
 
         private List<int> GetAllLoadCases()

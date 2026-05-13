@@ -53,6 +53,7 @@ namespace StaadSteelApp
     {
         string ActionText { get; }
         string ApplyText { get; }
+        bool UsesNodeSelection { get; }
         Control View { get; }
 
         void AttachContext(AdvanceActionContext context);

@@ -87,6 +87,35 @@ namespace StaadSteelApp
                 cboFrame.SelectedIndex = 0;
         }
 
+        public void LoadMembers(IEnumerable<int> memberIds, object openStaad)
+        {
+            _os = openStaad;
+            if (_allForces == null)
+                _allForces = new List<MemberForceData>();
+
+            var members = (memberIds ?? Enumerable.Empty<int>())
+                .Where(m => m > 0)
+                .Distinct()
+                .OrderBy(m => m)
+                .ToList();
+
+            cboFrame.SelectedIndexChanged -= cboFrame_SelectedIndexChanged;
+            cboFrame.Items.Clear();
+            foreach (int member in members)
+                cboFrame.Items.Add(member.ToString());
+
+            if (cboFrame.Items.Count > 0)
+                cboFrame.SelectedIndex = 0;
+
+            cboFrame.SelectedIndexChanged += cboFrame_SelectedIndexChanged;
+
+            if (members.Count > 0)
+            {
+                UpdateBuiltUpOption(members[0]);
+                PerformCalculation();
+            }
+        }
+
         private void CheckForm_Load(object sender, EventArgs e)
         {
             if (_os == null && !TryGetCheckOpenStaad(out _os))
@@ -95,7 +124,7 @@ namespace StaadSteelApp
                 return;
             }
 
-            if (_allForces == null || _allForces.Count == 0)
+            if ((_allForces == null || _allForces.Count == 0) && cboFrame.Items.Count == 0)
                 LoadSelectedBeams(false);
 
             _selectionTimer?.Start();
