@@ -102,17 +102,26 @@ namespace StaadSteelApp.Core.Advance
                 return 0;
             }
 
-            string targetName = name.Trim();
+            string targetName = NormalizeUptPropertyName(name);
             foreach (int propertyId in propertyIds)
             {
                 if (!OpenStaadPropertyAdapter.TryGetSectionPropertyName(propertyObj, propertyId, out string propertyName, out _))
                     continue;
 
-                if (string.Equals(propertyName, targetName, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(NormalizeUptPropertyName(propertyName), targetName, StringComparison.OrdinalIgnoreCase))
                     return propertyId;
             }
 
             return 0;
+        }
+
+        private static string NormalizeUptPropertyName(string name)
+        {
+            string normalized = (name ?? string.Empty).Trim();
+            while (normalized.StartsWith("UPT ", StringComparison.OrdinalIgnoreCase))
+                normalized = normalized.Substring(4).TrimStart();
+
+            return normalized;
         }
     }
 }

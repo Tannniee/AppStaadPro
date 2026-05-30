@@ -136,12 +136,44 @@ namespace StaadSteelApp.Core
             return AdvanceSectionMergeService.TryPreviewSectionMerge(out preview, out message);
         }
 
+        public static bool TryPreviewLoadFragments(
+            double forceTolerance,
+            out AdvanceLoadFragmentPreview preview,
+            out string message)
+        {
+            return AdvanceLoadFragmentService.TryPreviewLoadFragments(forceTolerance, out preview, out message);
+        }
+
+        public static bool TryPreviewLoadFragments(
+            int loadCaseNumber,
+            double forceTolerance,
+            out AdvanceLoadFragmentPreview preview,
+            out string message)
+        {
+            return AdvanceLoadFragmentService.TryPreviewLoadFragments(loadCaseNumber, forceTolerance, out preview, out message);
+        }
+
         public static bool TryMergeDuplicateSections(
             AdvanceSectionMergePreview preview,
             out int mergedMemberCount,
             out string message)
         {
             return AdvanceSectionMergeService.TryMergeDuplicateSections(preview, out mergedMemberCount, out message);
+        }
+
+        public static bool TryPreviewMemberReleaseMerge(
+            out AdvanceMemberReleaseMergePreview preview,
+            out string message)
+        {
+            return AdvanceMemberReleaseMergeService.TryPreviewMemberReleaseMerge(out preview, out message);
+        }
+
+        public static bool TryMergeMemberReleases(
+            AdvanceMemberReleaseMergePreview preview,
+            out int mergedMemberCount,
+            out string message)
+        {
+            return AdvanceMemberReleaseMergeService.TryMergeMemberReleases(preview, out mergedMemberCount, out message);
         }
 
         public static bool TryCreateAlignedNodeFromThreeNodes(

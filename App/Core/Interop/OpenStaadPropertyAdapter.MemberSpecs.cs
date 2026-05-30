@@ -78,7 +78,53 @@ namespace StaadSteelApp.Core.Interop
         internal static bool TryRemoveMemberReleaseSpecFromBeam(object propertyObj, int beamId, int location, out string error)
         {
             error = string.Empty;
-            return ComInvoke.TryInvoke(propertyObj, "RemoveMemberReleaseSpecFromBeam", out _, out error, new object[] { beamId, location });
+            if (!ComInvoke.TryInvoke(propertyObj, "RemoveMemberReleaseSpecFromBeam", out object result, out error, new object[] { beamId, location }))
+                return false;
+
+            if (result is bool success)
+                return success;
+
+            if (ComResult.TryToInt32(result, out int code))
+                return code != 0;
+
+            return result == null;
+        }
+
+        internal static bool TryDeleteMemberReleaseSpec(object propertyObj, int beamId, int location, out string error)
+        {
+            error = string.Empty;
+            if (!ComInvoke.TryInvoke(propertyObj, "DeleteMemberReleaseSpec", out object result, out error, new object[] { beamId, location }))
+                return false;
+
+            if (result is bool success)
+                return success;
+
+            if (ComResult.TryToInt32(result, out int code))
+                return code != 0;
+
+            return result == null;
+        }
+
+        internal static bool TryGetMemberReleaseSpec(object propertyObj, int beamId, int location, out int[] releaseStates, out double[] springValues, out string error)
+        {
+            releaseStates = new int[6];
+            springValues = new double[6];
+            error = string.Empty;
+
+            object[] args = new object[] { beamId, location, releaseStates, springValues };
+            if (!ComInvoke.TryInvoke(propertyObj, "GetMemberReleaseSpec", out object result, out error, args, ComInvoke.ByRefModifiers(4, 2, 3)))
+                return false;
+
+            int code = result == null ? 0 : ComResult.ToInt32(result);
+            if (code != 1)
+            {
+                error = "GetMemberReleaseSpec returned " + code + ".";
+                return false;
+            }
+
+            releaseStates = ComResult.ToIntArray(args[2]);
+            springValues = ComResult.ToDoubleArray(args[3]);
+            return true;
         }
 
         internal static int AssignBetaAngle(object propertyObj, int[] beams, double angle, out string error)

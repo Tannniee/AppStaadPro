@@ -33,6 +33,8 @@
             this.btnRun = new System.Windows.Forms.Button();
             this.btnAdvance = new System.Windows.Forms.Button();
             this.btnAssignLoad = new System.Windows.Forms.Button();
+            this.btnHideSelected = new System.Windows.Forms.Button();
+            this.btnViewSelected = new System.Windows.Forms.Button();
             this.btnGroups = new System.Windows.Forms.Button();
             this.chkUPT = new System.Windows.Forms.CheckBox();
             this.chkUsedSections = new System.Windows.Forms.CheckBox();
@@ -126,7 +128,7 @@
             //
             this.cboMaterial.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cboMaterial.FormattingEnabled = true;
-            this.cboMaterial.Location = new System.Drawing.Point(63, 399);
+            this.cboMaterial.Location = new System.Drawing.Point(63, 367);
             this.cboMaterial.Name = "cboMaterial";
             this.cboMaterial.Size = new System.Drawing.Size(128, 21);
             this.cboMaterial.TabIndex = 7;
@@ -134,7 +136,7 @@
             // lblMat
             //
             this.lblMat.AutoSize = true;
-            this.lblMat.Location = new System.Drawing.Point(18, 402);
+            this.lblMat.Location = new System.Drawing.Point(18, 370);
             this.lblMat.Name = "lblMat";
             this.lblMat.Size = new System.Drawing.Size(44, 13);
             this.lblMat.TabIndex = 14;
@@ -143,7 +145,7 @@
             // btnApplySel
             //
             this.btnApplySel.BackColor = System.Drawing.Color.White;
-            this.btnApplySel.Location = new System.Drawing.Point(106, 426);
+            this.btnApplySel.Location = new System.Drawing.Point(106, 394);
             this.btnApplySel.Name = "btnApplySel";
             this.btnApplySel.Size = new System.Drawing.Size(85, 30);
             this.btnApplySel.TabIndex = 13;
@@ -156,7 +158,7 @@
             this.grpCopyPaste.Controls.Add(this.txtCopied);
             this.grpCopyPaste.Controls.Add(this.btnCopy);
             this.grpCopyPaste.Controls.Add(this.btnPaste);
-            this.grpCopyPaste.Location = new System.Drawing.Point(15, 462);
+            this.grpCopyPaste.Location = new System.Drawing.Point(15, 430);
             this.grpCopyPaste.Name = "grpCopyPaste";
             this.grpCopyPaste.Size = new System.Drawing.Size(176, 90);
             this.grpCopyPaste.TabIndex = 10;
@@ -215,7 +217,7 @@
             // btnApplyAll
             //
             this.btnApplyAll.BackColor = System.Drawing.Color.White;
-            this.btnApplyAll.Location = new System.Drawing.Point(15, 426);
+            this.btnApplyAll.Location = new System.Drawing.Point(15, 394);
             this.btnApplyAll.Name = "btnApplyAll";
             this.btnApplyAll.Size = new System.Drawing.Size(85, 30);
             this.btnApplyAll.TabIndex = 9;
@@ -225,7 +227,7 @@
             //
             // btnClean
             //
-            this.btnClean.Location = new System.Drawing.Point(106, 558);
+            this.btnClean.Location = new System.Drawing.Point(106, 630);
             this.btnClean.Name = "btnClean";
             this.btnClean.Size = new System.Drawing.Size(85, 30);
             this.btnClean.TabIndex = 11;
@@ -235,7 +237,7 @@
             //
             // btnMisc
             //
-            this.btnMisc.Location = new System.Drawing.Point(15, 558);
+            this.btnMisc.Location = new System.Drawing.Point(15, 560);
             this.btnMisc.Name = "btnMisc";
             this.btnMisc.Size = new System.Drawing.Size(85, 30);
             this.btnMisc.TabIndex = 12;
@@ -245,7 +247,7 @@
             //
             // btnFindReplace
             //
-            this.btnFindReplace.Location = new System.Drawing.Point(15, 594);
+            this.btnFindReplace.Location = new System.Drawing.Point(15, 596);
             this.btnFindReplace.Name = "btnFindReplace";
             this.btnFindReplace.Size = new System.Drawing.Size(85, 30);
             this.btnFindReplace.TabIndex = 13;
@@ -255,7 +257,7 @@
             //
             // btnRun
             //
-            this.btnRun.Location = new System.Drawing.Point(106, 594);
+            this.btnRun.Location = new System.Drawing.Point(106, 596);
             this.btnRun.Name = "btnRun";
             this.btnRun.Size = new System.Drawing.Size(85, 30);
             this.btnRun.TabIndex = 15;
@@ -265,7 +267,7 @@
             //
             // btnAdvance
             //
-            this.btnAdvance.Location = new System.Drawing.Point(106, 628);
+            this.btnAdvance.Location = new System.Drawing.Point(106, 560);
             this.btnAdvance.Name = "btnAdvance";
             this.btnAdvance.Size = new System.Drawing.Size(85, 30);
             this.btnAdvance.TabIndex = 16;
@@ -275,17 +277,37 @@
             //
             // btnAssignLoad
             //
-            this.btnAssignLoad.Location = new System.Drawing.Point(15, 628);
+            this.btnAssignLoad.Location = new System.Drawing.Point(15, 630);
             this.btnAssignLoad.Name = "btnAssignLoad";
             this.btnAssignLoad.Size = new System.Drawing.Size(85, 30);
             this.btnAssignLoad.TabIndex = 17;
-            this.btnAssignLoad.Text = "ASSIGN load";
+            this.btnAssignLoad.Text = "Assign Load";
             this.btnAssignLoad.UseVisualStyleBackColor = true;
             this.btnAssignLoad.Click += new System.EventHandler(this.btnAssignLoad_Click);
             //
+            // btnHideSelected
+            //
+            this.btnHideSelected.Location = new System.Drawing.Point(15, 526);
+            this.btnHideSelected.Name = "btnHideSelected";
+            this.btnHideSelected.Size = new System.Drawing.Size(85, 30);
+            this.btnHideSelected.TabIndex = 21;
+            this.btnHideSelected.Text = "Hide Selected";
+            this.btnHideSelected.UseVisualStyleBackColor = true;
+            this.btnHideSelected.Click += new System.EventHandler(this.btnHideSelected_Click);
+            //
+            // btnViewSelected
+            //
+            this.btnViewSelected.Location = new System.Drawing.Point(106, 526);
+            this.btnViewSelected.Name = "btnViewSelected";
+            this.btnViewSelected.Size = new System.Drawing.Size(85, 30);
+            this.btnViewSelected.TabIndex = 22;
+            this.btnViewSelected.Text = "View Selected";
+            this.btnViewSelected.UseVisualStyleBackColor = true;
+            this.btnViewSelected.Click += new System.EventHandler(this.btnViewSelected_Click);
+            //
             // btnGroups
             //
-            this.btnGroups.Location = new System.Drawing.Point(15, 662);
+            this.btnGroups.Location = new System.Drawing.Point(15, 664);
             this.btnGroups.Name = "btnGroups";
             this.btnGroups.Size = new System.Drawing.Size(176, 30);
             this.btnGroups.TabIndex = 20;
@@ -551,7 +573,7 @@
             this.grpDimensions.Controls.Add(this.cboSeries);
             this.grpDimensions.Location = new System.Drawing.Point(21, 160);
             this.grpDimensions.Name = "grpDimensions";
-            this.grpDimensions.Size = new System.Drawing.Size(176, 232);
+            this.grpDimensions.Size = new System.Drawing.Size(176, 200);
             this.grpDimensions.TabIndex = 6;
             this.grpDimensions.TabStop = false;
             this.grpDimensions.Text = "Dimensions";
@@ -562,7 +584,7 @@
             this.grpUsedSections.Controls.Add(this.lstUsedSections);
             this.grpUsedSections.Location = new System.Drawing.Point(21, 160);
             this.grpUsedSections.Name = "grpUsedSections";
-            this.grpUsedSections.Size = new System.Drawing.Size(176, 232);
+            this.grpUsedSections.Size = new System.Drawing.Size(176, 200);
             this.grpUsedSections.TabIndex = 19;
             this.grpUsedSections.TabStop = false;
             this.grpUsedSections.Text = "Used Sections";
@@ -575,12 +597,12 @@
             this.lstUsedSections.IntegralHeight = false;
             this.lstUsedSections.Location = new System.Drawing.Point(10, 20);
             this.lstUsedSections.Name = "lstUsedSections";
-            this.lstUsedSections.Size = new System.Drawing.Size(156, 202);
+            this.lstUsedSections.Size = new System.Drawing.Size(156, 170);
             this.lstUsedSections.TabIndex = 0;
             //
             // MainForm
             //
-            this.ClientSize = new System.Drawing.Size(203, 702);
+            this.ClientSize = new System.Drawing.Size(203, 704);
             this.Controls.Add(this.grpUsedSections);
             this.Controls.Add(this.chkUsedSections);
             this.Controls.Add(this.chkUPT);
@@ -603,6 +625,8 @@
             this.Controls.Add(this.btnRun);
             this.Controls.Add(this.btnAdvance);
             this.Controls.Add(this.btnAssignLoad);
+            this.Controls.Add(this.btnHideSelected);
+            this.Controls.Add(this.btnViewSelected);
             this.Controls.Add(this.btnGroups);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
             this.Name = "MainForm";
@@ -639,6 +663,8 @@
         private System.Windows.Forms.Button btnRun;
         private System.Windows.Forms.Button btnAdvance;
         private System.Windows.Forms.Button btnAssignLoad;
+        private System.Windows.Forms.Button btnHideSelected;
+        private System.Windows.Forms.Button btnViewSelected;
         private System.Windows.Forms.Button btnGroups;
         private System.Windows.Forms.Button btnDetectAll;
         private System.Windows.Forms.CheckBox chkUPT;

@@ -56,6 +56,8 @@ namespace StaadSteelApp
             _actionPanels.Add(new BeamPlanePanel());
             _actionPanels.Add(new ConvertUptPanel());
             _actionPanels.Add(new MergeSectionsPanel());
+            _actionPanels.Add(new MergeMemberReleasesPanel());
+            _actionPanels.Add(new LoadFragmentPreviewPanel());
         }
 
         private void InitializeActionHost()

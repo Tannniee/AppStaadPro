@@ -97,6 +97,36 @@ namespace StaadSteelApp
                 _ => UpdateMiscPanelLocation());
         }
 
+        private void btnHideSelected_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!TryGetMainOpenStaad(out object openStaad)) return;
+
+                ServiceOperationResult result = ViewFilterService.HideSelectedBeams(openStaad);
+                ServiceOperationResultPresenter.Show(result);
+            }
+            catch (Exception ex)
+            {
+                TopMostMessageBox.ShowError("Hide selected error: " + ex.Message, "View Filter");
+            }
+        }
+
+        private void btnViewSelected_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!TryGetMainOpenStaad(out object openStaad)) return;
+
+                ServiceOperationResult result = ViewFilterService.ViewOnlySelectedBeams(openStaad);
+                ServiceOperationResultPresenter.Show(result);
+            }
+            catch (Exception ex)
+            {
+                TopMostMessageBox.ShowError("View selected error: " + ex.Message, "View Filter");
+            }
+        }
+
         private void btnFindReplace_Click(object sender, EventArgs e)
         {
             try

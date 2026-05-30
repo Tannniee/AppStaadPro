@@ -14,13 +14,13 @@ namespace StaadSteelApp.Core
             object openStaad = os;
             if (!TryGetSectionProperty(openStaad, out object propObj, out string propertyError))
             {
-                WarnOnce("IsotropicMaterialPropertyObject", "Could not read STAAD property object. Material dropdown may be incomplete. " + propertyError);
+                WarnOnce(openStaad, "IsotropicMaterialPropertyObject", "Could not read STAAD property object. Material dropdown may be incomplete. " + propertyError);
                 return materials;
             }
 
             if (!OpenStaadPropertyAdapter.TryGetIsotropicMaterialCount(propObj, out int count, out string countError))
             {
-                WarnOnce("IsotropicMaterialCount", "Could not read isotropic material count from STAAD. Material dropdown may be incomplete. " + countError);
+                WarnOnce(openStaad, "IsotropicMaterialCount", "Could not read isotropic material count from STAAD. Material dropdown may be incomplete. " + countError);
                 return materials;
             }
 
@@ -40,7 +40,7 @@ namespace StaadSteelApp.Core
                     else
                     {
                         if (materials.Count == 0 && i <= startInclusive)
-                            WarnOnce("IsotropicMaterials:Read", "Could not read isotropic material properties from STAAD. Material dropdown may be incomplete. " + readError);
+                            WarnOnce(openStaad, "IsotropicMaterials:Read", "Could not read isotropic material properties from STAAD. Material dropdown may be incomplete. " + readError);
                     }
                 }
             }
@@ -53,7 +53,7 @@ namespace StaadSteelApp.Core
             {
                 ReadMaterials(1, count + 1);
                 if (materials.Count == 0)
-                    WarnOnce("IsotropicMaterials:Empty", "STAAD reported isotropic materials, but none could be read. Material dropdown may be incomplete.");
+                    WarnOnce(openStaad, "IsotropicMaterials:Empty", "STAAD reported isotropic materials, but none could be read. Material dropdown may be incomplete.");
             }
 
             return materials;

@@ -123,7 +123,7 @@ namespace StaadSteelApp.Core.Advance
                 return new AdvanceUptConversionGroup
                 {
                     DisplayName = Candidate.DisplayName,
-                    UptPropertyName = "UPT " + Candidate.DisplayName,
+                    UptPropertyName = Candidate.DisplayName,
                     Shape = Candidate.Shape,
                     DepthMm = Candidate.DepthMm,
                     WidthMm = Candidate.WidthMm,

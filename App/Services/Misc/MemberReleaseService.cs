@@ -173,18 +173,63 @@ namespace StaadSteelApp.Core.Misc
 
             foreach (int beam in beams)
             {
-                if (OpenStaadPropertyAdapter.TryRemoveMemberReleaseSpecFromBeam(propObj, beam, location, out string removeError))
-                    success++;
-                else
+                if (!HasExistingRelease(propObj, beam, location))
                 {
-                    string message = $"Beam {beam}, loc {location}: {removeError}";
-                    sb.AppendLine(message);
-                    Debug.WriteLine("RemoveMemberReleaseSpecFromBeam failed: " + message);
+                    success++;
+                    continue;
                 }
+
+                bool removed = OpenStaadPropertyAdapter.TryRemoveMemberReleaseSpecFromBeam(propObj, beam, location, out string removeError);
+                if (!removed)
+                    removed = OpenStaadPropertyAdapter.TryDeleteMemberReleaseSpec(propObj, beam, location, out removeError);
+
+                if (removed || !HasExistingRelease(propObj, beam, location))
+                {
+                    success++;
+                    continue;
+                }
+
+                string message = $"Beam {beam}, loc {location}: {removeError}";
+                sb.AppendLine(message);
+                Debug.WriteLine("RemoveMemberReleaseSpecFromBeam failed: " + message);
             }
 
             errorLog = sb.ToString();
             return success == beams.Length;
+        }
+
+        private static bool HasExistingRelease(object propObj, int beamId, int location)
+        {
+            if (!OpenStaadPropertyAdapter.TryGetMemberReleaseSpec(
+                    propObj,
+                    beamId,
+                    location,
+                    out int[] releaseStates,
+                    out double[] springValues,
+                    out _))
+            {
+                return false;
+            }
+
+            if (releaseStates != null)
+            {
+                foreach (int state in releaseStates)
+                {
+                    if (state != 0)
+                        return true;
+                }
+            }
+
+            if (springValues != null)
+            {
+                foreach (double value in springValues)
+                {
+                    if (Math.Abs(value) > 0.0000001)
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool TryApplyReleaseSpec(object propObj, int[] beams, int location, int[] dofRelease, out string errorLog)

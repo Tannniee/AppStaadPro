@@ -43,9 +43,7 @@ namespace StaadSteelApp.Core.Misc
                 return ServiceOperationResult.Warning("Beta Angle", "Angle must be a number.");
             }
 
-            string assignError;
-            OpenStaadPropertyAdapter.AssignBetaAngle(propObj, beamIds, angle, out assignError);
-            return ServiceOperationResult.Success("Beta Angle", $"Beta Angle {angle} deg applied to {beamCount} beams.");
+            return ApplyBetaAngleSelected(angle);
         }
 
         internal static ServiceOperationResult ApplyBetaAngleSelected(double angle)
@@ -71,13 +69,6 @@ namespace StaadSteelApp.Core.Misc
                     ? "Please select beams in STAAD."
                     : "Could not read STAAD selection: " + selectionError;
                 return ServiceOperationResult.Info("Beta Angle", message);
-            }
-
-            if (Math.Abs(angle) < 1e-9)
-            {
-                return ServiceOperationResult.Info(
-                    "Beta Angle",
-                    "Beta angle reset to 0 is unstable via OpenSTAAD on this setup. Please clear Local Axes manually in STAAD.");
             }
 
             bool success = TryAssignBetaAngle(propObj, beamIds, angle, out string errorLog);
@@ -125,7 +116,8 @@ namespace StaadSteelApp.Core.Misc
         private static bool TryAssignBetaAngle(object propObj, int[] beams, double angle, out string errorLog)
         {
             var sb = new System.Text.StringBuilder();
-            int bulkCode = InvokeAssignBetaAngle(propObj, beams, angle, out string bulkError);
+            double commandAngle = GetOpenStaadCommandAngle(angle);
+            int bulkCode = InvokeAssignBetaAngle(propObj, beams, commandAngle, out string bulkError);
             if (!IsAssignBetaSuccessCode(bulkCode) && bulkCode != 0)
             {
                 string message = bulkCode < 0
@@ -144,7 +136,7 @@ namespace StaadSteelApp.Core.Misc
 
             foreach (int beam in remaining)
             {
-                int code = InvokeAssignBetaAngle(propObj, new[] { beam }, angle, out string retryError);
+                int code = InvokeAssignBetaAngle(propObj, new[] { beam }, commandAngle, out string retryError);
                 if (BeamMatchesBetaAngle(propObj, beam, angle))
                     continue;
 
@@ -220,6 +212,11 @@ namespace StaadSteelApp.Core.Misc
             double normalizedActual = NormalizeAngle(actual);
             double normalizedTarget = NormalizeAngle(target);
             return Math.Abs(normalizedActual - normalizedTarget) < 1e-6;
+        }
+
+        private static double GetOpenStaadCommandAngle(double angle)
+        {
+            return Math.Abs(NormalizeAngle(angle)) < 1e-9 ? 360.0 : angle;
         }
 
         private static double NormalizeAngle(double angle)

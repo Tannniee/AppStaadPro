@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using StaadSteelApp.Core;
@@ -19,6 +20,7 @@ namespace StaadSteelApp
              txtBfb.Visible = lblBfb.Visible = true;
              txtTfb.Visible = lblTfb.Visible = true;
              txtDis.Visible = lblDis.Visible = false;
+             ResetDimensionLabels();
 
             // Legacy catalog selectors are shown only for Legacy mode.
             lblZone.Visible = cboZone.Visible = false;
@@ -223,6 +225,48 @@ namespace StaadSteelApp
             }
 
             UpdateLegacyTypeSpecUI();
+            LayoutDimensionRows();
+        }
+
+        private void ResetDimensionLabels()
+        {
+            lblH1.Text = "H1";
+            lblH2.Text = "H2";
+            lblTw.Text = "Tw";
+            lblBf.Text = "Bf";
+            lblTf.Text = "Tf";
+            lblBfb.Text = "Bfb";
+            lblTfb.Text = "Tfb";
+            lblDis.Text = "Gap/Dis";
+        }
+
+        private void LayoutDimensionRows()
+        {
+            int y = 20;
+            LayoutDimensionRow(lblH1, txtH1, ref y);
+            LayoutDimensionRow(lblH2, txtH2, ref y);
+            LayoutDimensionRow(lblTw, txtTw, ref y);
+            LayoutDimensionRow(lblBf, txtBf, ref y);
+            LayoutDimensionRow(lblTf, txtTf, ref y);
+            LayoutDimensionRow(lblBfb, txtBfb, ref y);
+            LayoutDimensionRow(lblTfb, txtTfb, ref y);
+            LayoutDimensionRow(lblDis, txtDis, ref y);
+
+            y = 20;
+            LayoutDimensionRow(lblZone, cboZone, ref y);
+            LayoutDimensionRow(lblShape, cboShape, ref y);
+            LayoutDimensionRow(lblSeries, cboSeries, ref y);
+            LayoutDimensionRow(lblSection, cboSection, ref y);
+        }
+
+        private static void LayoutDimensionRow(Label label, Control input, ref int y)
+        {
+            if (label == null || input == null || !label.Visible || !input.Visible)
+                return;
+
+            label.Location = new Point(label.Left, y + 3);
+            input.Location = new Point(input.Left, y);
+            y += 25;
         }
 
          private void UpdateName()

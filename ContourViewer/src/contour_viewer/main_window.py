@@ -48,7 +48,7 @@ class MainWindow(QMainWindow):
         self._intensity_node_text = ""
         self._intensity_elevation_auto = True
         self._intensity_elevation = 0.0
-        self._intensity_tolerance = 0.01
+        self._intensity_tolerance = 5.0
         self._intensity_round_mm = 100.0
         self._intensity_boundary_offset = 1.0
         self._intensity_source_mode = "Pressure / Area"
@@ -853,6 +853,7 @@ class MainWindow(QMainWindow):
                 tuple(node_ids),
                 up_axis,
                 round(elevation, 8),
+                round(self._intensity_tolerance, 4),
                 round(self._intensity_round_mm, 4),
                 round(self._intensity_boundary_offset, 8),
                 self._intensity_source_mode,
@@ -1070,8 +1071,12 @@ class MainWindow(QMainWindow):
         if not self._intensity_elevation_auto:
             return self._intensity_elevation
 
-        first_node = self._current_model.nodes[node_ids[0]]
-        elevation = first_node.y if up_axis == "Y" else first_node.z
+        values: list[tuple[int, float]] = []
+        for node_id in node_ids:
+            node = self._current_model.nodes[node_id]
+            values.append((node_id, node.y if up_axis == "Y" else node.z))
+
+        elevation = sum(value for _, value in values) / len(values)
         self._intensity_elevation = elevation
         self.selection_panel.set_intensity_elevation(elevation)
         return elevation
@@ -1081,15 +1086,15 @@ class MainWindow(QMainWindow):
         node_ids: list[int],
         up_axis: str,
         elevation: float,
-        tolerance: float,
+        tolerance_percent: float,
     ) -> list[tuple[int, float]]:
         off_plane: list[tuple[int, float]] = []
-        round_tolerance = self._intensity_round_mm / self._model_length_to_mm_factor(self._current_model.unit_length)
+        plane_tolerance = abs(elevation) * max(tolerance_percent, 0.0) / 100.0
         for node_id in node_ids:
             node = self._current_model.nodes[node_id]
             value = node.y if up_axis == "Y" else node.z
             delta = value - elevation
-            if abs(delta) > tolerance and abs(delta) > round_tolerance:
+            if abs(delta) > plane_tolerance:
                 off_plane.append((node_id, delta))
         return off_plane
 
@@ -1325,7 +1330,7 @@ class MainWindow(QMainWindow):
         self._intensity_node_text = self._settings.value("intensity/node_group", "", str)
         self._intensity_elevation_auto = self._settings.value("intensity/elevation_auto", True, bool)
         self._intensity_elevation = float(self._settings.value("intensity/elevation", 0.0))
-        self._intensity_tolerance = float(self._settings.value("intensity/tolerance", 0.01))
+        self._intensity_tolerance = float(self._settings.value("intensity/mean_tolerance_percent", 5.0))
         self._intensity_round_mm = float(self._settings.value("intensity/round_mm", 100.0))
         self._intensity_boundary_offset = float(self._settings.value("intensity/boundary_offset", 1.0))
         self._intensity_source_mode = self._settings.value("intensity/source_mode", "Pressure / Area", str)
@@ -1383,7 +1388,7 @@ class MainWindow(QMainWindow):
             self._settings.setValue("intensity/node_group", self.selection_panel.selected_intensity_node_text())
             self._settings.setValue("intensity/elevation_auto", self.selection_panel.is_intensity_elevation_auto())
             self._settings.setValue("intensity/elevation", self.selection_panel.selected_intensity_elevation())
-            self._settings.setValue("intensity/tolerance", self.selection_panel.selected_intensity_tolerance())
+            self._settings.setValue("intensity/mean_tolerance_percent", self.selection_panel.selected_intensity_tolerance())
             self._settings.setValue("intensity/round_mm", self.selection_panel.selected_intensity_round_mm())
             self._settings.setValue(
                 "intensity/boundary_offset",
