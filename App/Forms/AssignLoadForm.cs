@@ -11,6 +11,7 @@ namespace StaadSteelApp
         private const int LoadTreeShiftWidth = 350;
         private readonly int _collapsedClientWidth;
         private LoadTreeForm _loadTreeForm;
+        private string _boundModelKey = string.Empty;
 
         public AssignLoadForm()
         {
@@ -27,15 +28,21 @@ namespace StaadSteelApp
 
         private void LoadCases()
         {
+            _boundModelKey = string.Empty;
             try
             {
+                if (!StaadManager.TryGetConnection(out StaadConnectionSnapshot connection, out string connectionError))
+                    throw new InvalidOperationException(connectionError);
+
                 cboLoadCases.BeginUpdate();
                 cboLoadCases.Items.Clear();
 
-                foreach (var loadCase in LoadService.GetPrimaryLoadCases())
+                foreach (var loadCase in LoadService.GetPrimaryLoadCases(connection.OpenStaad))
                 {
                     cboLoadCases.Items.Add(loadCase);
                 }
+
+                _boundModelKey = connection.Identity.CacheKey;
 
                 if (cboLoadCases.Items.Count > 0)
                 {
@@ -58,8 +65,30 @@ namespace StaadSteelApp
             RefreshEmbeddedLoadTree();
         }
 
+        internal void HandleActiveModelChanged(bool connected)
+        {
+            cboLoadCases.Items.Clear();
+            cboGroups.Items.Clear();
+            _boundModelKey = string.Empty;
+
+            if (!connected)
+            {
+                _loadTreeForm?.HandleActiveModelChanged(false);
+                return;
+            }
+
+            LoadCases();
+            if (rbGroupSource.Checked)
+                LoadGroups();
+            RefreshEmbeddedLoadTree();
+        }
+
         private void btnAssign_Click(object sender, EventArgs e)
         {
+            string expectedModelKey = _boundModelKey;
+            if (!TryGetBoundOpenStaad(expectedModelKey, out object openStaad, showWarning: true))
+                return;
+
             if (!(cboLoadCases.SelectedItem is LoadService.LoadCaseItem selectedCase))
             {
                 TopMostMessageBox.ShowWarning("Please select a load case.", "Assign Load");
@@ -84,11 +113,11 @@ namespace StaadSteelApp
 
                     if (useGroup)
                     {
-                        LoadService.AssignUniformMemberLoadToGroup(selectedCase.Number, groupName, direction, force);
+                        LoadService.AssignUniformMemberLoadToGroup(openStaad, selectedCase.Number, groupName, direction, force);
                     }
                     else
                     {
-                        LoadService.AssignUniformMemberLoad(selectedCase.Number, direction, force);
+                        LoadService.AssignUniformMemberLoad(openStaad, selectedCase.Number, direction, force);
                     }
 
                     TopMostMessageBox.ShowSuccess(
@@ -108,11 +137,11 @@ namespace StaadSteelApp
 
                     if (useGroup)
                     {
-                        LoadService.AssignNodalLoadToGroup(selectedCase.Number, groupName, fx, fy, fz, mx, my, mz);
+                        LoadService.AssignNodalLoadToGroup(openStaad, selectedCase.Number, groupName, fx, fy, fz, mx, my, mz);
                     }
                     else
                     {
-                        LoadService.AssignNodalLoad(selectedCase.Number, fx, fy, fz, mx, my, mz);
+                        LoadService.AssignNodalLoad(openStaad, selectedCase.Number, fx, fy, fz, mx, my, mz);
                     }
 
                     TopMostMessageBox.ShowSuccess(
@@ -265,7 +294,10 @@ namespace StaadSteelApp
                 cboGroups.BeginUpdate();
                 cboGroups.Items.Clear();
 
-                foreach (string groupName in LoadService.GetGroupNames(groupType))
+                if (!TryGetBoundOpenStaad(_boundModelKey, out object openStaad, showWarning: false))
+                    return;
+
+                foreach (string groupName in LoadService.GetGroupNames(openStaad, groupType))
                 {
                     cboGroups.Items.Add(groupName);
                 }
@@ -293,6 +325,32 @@ namespace StaadSteelApp
             {
                 cboGroups.EndUpdate();
             }
+        }
+
+        private bool TryGetBoundOpenStaad(string expectedModelKey, out object openStaad, bool showWarning)
+        {
+            openStaad = null;
+            if (!StaadManager.TryGetConnection(out StaadConnectionSnapshot connection, out string error))
+            {
+                if (showWarning)
+                    TopMostMessageBox.ShowWarning(error, "Assign Load");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(expectedModelKey) ||
+                !string.Equals(expectedModelKey, connection.Identity.CacheKey, StringComparison.OrdinalIgnoreCase))
+            {
+                if (showWarning)
+                {
+                    TopMostMessageBox.ShowWarning(
+                        "The active STAAD model changed. Load cases were refreshed; please review the selection and try again.",
+                        "Assign Load");
+                }
+                return false;
+            }
+
+            openStaad = connection.OpenStaad;
+            return true;
         }
 
         private LoadService.MemberLoadDirection GetSelectedDirection()

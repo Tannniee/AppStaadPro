@@ -9,17 +9,23 @@ namespace StaadSteelApp.Core.Misc
     internal static class MemberSpecService
     {
         private static readonly object _specCacheLock = new object();
-        private static readonly Dictionary<int, MiscMemberSpecType> _lastAppliedSpecByBeam = new Dictionary<int, MiscMemberSpecType>();
+        private static readonly Dictionary<string, MiscMemberSpecType> _lastAppliedSpecByModelAndBeam =
+            new Dictionary<string, MiscMemberSpecType>(StringComparer.OrdinalIgnoreCase);
 
         internal static ServiceOperationResult ApplyMemberSpecSelected(MiscMemberSpecType specType)
         {
-            if (!MiscOpenStaadService.TryGetProperty(out object propObj, out string propertyError))
+            if (!MiscOpenStaadService.TryGetConnection(out StaadConnectionSnapshot connection, out string connectionError))
+                return ServiceOperationResult.Error("Member Spec", connectionError);
+
+            object openStaad = connection.OpenStaad;
+            string modelKey = connection.Identity.CacheKey;
+            if (!MiscOpenStaadService.TryGetProperty(openStaad, out object propObj, out string propertyError))
             {
                 Debug.WriteLine(propertyError);
                 return ServiceOperationResult.Error("Member Spec", propertyError);
             }
 
-            if (!MiscSelectionService.TryGetSelectedBeamIds(out int[] beamIds, out string selectionError))
+            if (!MiscSelectionService.TryGetSelectedBeamIds(openStaad, out int[] beamIds, out string selectionError))
             {
                 string message = string.IsNullOrWhiteSpace(selectionError)
                     ? "Could not read STAAD selection."
@@ -40,8 +46,8 @@ namespace StaadSteelApp.Core.Misc
             {
                 if (specType == MiscMemberSpecType.Normal)
                 {
-                    int cleared = ClearMemberSpecs(propObj, beamIds, null, out string clearWarning);
-                    ClearCachedSpecs(beamIds);
+                    int cleared = ClearMemberSpecs(propObj, beamIds, null, modelKey, out string clearWarning);
+                    ClearCachedSpecs(modelKey, beamIds);
                     if (!string.IsNullOrWhiteSpace(clearWarning))
                         Debug.WriteLine(clearWarning);
 
@@ -60,7 +66,7 @@ namespace StaadSteelApp.Core.Misc
                     return ServiceOperationResult.Error("Member Spec", message);
                 }
 
-                ClearMemberSpecs(propObj, beamIds, specType, out string clearConflictsWarning);
+                ClearMemberSpecs(propObj, beamIds, specType, modelKey, out string clearConflictsWarning);
                 if (!string.IsNullOrWhiteSpace(clearConflictsWarning))
                     Debug.WriteLine(clearConflictsWarning);
 
@@ -69,7 +75,7 @@ namespace StaadSteelApp.Core.Misc
                     return ServiceOperationResult.Error("Member Spec", "Assign member spec failed: " + assignError);
                 }
 
-                CacheSpecForBeams(beamIds, specType);
+                CacheSpecForBeams(modelKey, beamIds, specType);
                 return ServiceOperationResult.Success(
                     "Member Spec",
                     $"{GetSpecTypeLabel(specType)} member spec applied to {beamCount} beams.");
@@ -82,7 +88,12 @@ namespace StaadSteelApp.Core.Misc
             }
         }
 
-        private static int ClearMemberSpecs(object propObj, int[] beams, MiscMemberSpecType? keepSpecType, out string warningLog)
+        private static int ClearMemberSpecs(
+            object propObj,
+            int[] beams,
+            MiscMemberSpecType? keepSpecType,
+            string modelKey,
+            out string warningLog)
         {
             var warnings = new StringBuilder();
             int cleared = 0;
@@ -92,7 +103,7 @@ namespace StaadSteelApp.Core.Misc
                 if (beam <= 0)
                     continue;
 
-                if (TryGetCachedSpecCode(beam, out int cachedSpecCode))
+                if (TryGetCachedSpecCode(modelKey, beam, out int cachedSpecCode))
                 {
                     if (keepSpecType.HasValue && cachedSpecCode == GetExpectedMemberSpecCode(keepSpecType.Value))
                     {
@@ -103,7 +114,7 @@ namespace StaadSteelApp.Core.Misc
                     if (TryRemoveMemberSpecByCode(propObj, beam, cachedSpecCode, out string cachedRemoveError))
                     {
                         cleared++;
-                        RemoveCachedSpec(beam);
+                        RemoveCachedSpec(modelKey, beam);
                         continue;
                     }
 
@@ -120,7 +131,7 @@ namespace StaadSteelApp.Core.Misc
 
                 if (ok)
                 {
-                    RemoveCachedSpec(beam);
+                    RemoveCachedSpec(modelKey, beam);
                     cleared++;
                 }
             }
@@ -129,7 +140,7 @@ namespace StaadSteelApp.Core.Misc
             return cleared;
         }
 
-        private static void CacheSpecForBeams(int[] beams, MiscMemberSpecType specType)
+        private static void CacheSpecForBeams(string modelKey, int[] beams, MiscMemberSpecType specType)
         {
             if (beams == null || beams.Length == 0)
                 return;
@@ -139,12 +150,12 @@ namespace StaadSteelApp.Core.Misc
                 foreach (int beam in beams)
                 {
                     if (beam > 0)
-                        _lastAppliedSpecByBeam[beam] = specType;
+                        _lastAppliedSpecByModelAndBeam[BuildSpecCacheKey(modelKey, beam)] = specType;
                 }
             }
         }
 
-        private static void ClearCachedSpecs(int[] beams)
+        private static void ClearCachedSpecs(string modelKey, int[] beams)
         {
             if (beams == null || beams.Length == 0)
                 return;
@@ -154,23 +165,23 @@ namespace StaadSteelApp.Core.Misc
                 foreach (int beam in beams)
                 {
                     if (beam > 0)
-                        _lastAppliedSpecByBeam.Remove(beam);
+                        _lastAppliedSpecByModelAndBeam.Remove(BuildSpecCacheKey(modelKey, beam));
                 }
             }
         }
 
-        private static void RemoveCachedSpec(int beam)
+        private static void RemoveCachedSpec(string modelKey, int beam)
         {
             if (beam <= 0)
                 return;
 
             lock (_specCacheLock)
             {
-                _lastAppliedSpecByBeam.Remove(beam);
+                _lastAppliedSpecByModelAndBeam.Remove(BuildSpecCacheKey(modelKey, beam));
             }
         }
 
-        private static bool TryGetCachedSpecCode(int beam, out int specCode)
+        private static bool TryGetCachedSpecCode(string modelKey, int beam, out int specCode)
         {
             specCode = -1;
             if (beam <= 0)
@@ -178,12 +189,19 @@ namespace StaadSteelApp.Core.Misc
 
             lock (_specCacheLock)
             {
-                if (!_lastAppliedSpecByBeam.TryGetValue(beam, out MiscMemberSpecType specType))
+                if (!_lastAppliedSpecByModelAndBeam.TryGetValue(
+                        BuildSpecCacheKey(modelKey, beam),
+                        out MiscMemberSpecType specType))
                     return false;
 
                 specCode = GetExpectedMemberSpecCode(specType);
                 return specCode >= 0;
             }
+        }
+
+        private static string BuildSpecCacheKey(string modelKey, int beam)
+        {
+            return (modelKey ?? "staad:unknown") + "|beam:" + beam;
         }
 
         private static bool TryRemoveMemberSpecByCode(object propObj, int beam, int specCode, out string error)

@@ -1,21 +1,14 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using System.Runtime.InteropServices;
 using StaadSteelApp.Core;
-using StaadSteelApp.Core.Check;
-using StaadSteelApp.Core.Interop;
-using StaadSteelApp.AISC360;
-using System.Linq;
 
 namespace StaadSteelApp
 {
     public partial class MainForm
     {
         private bool _isRunningAnalysis;
+        private bool _isHighlightingRatio;
 
         private void btnApplySel_Click(object sender, EventArgs e)
         {
@@ -78,7 +71,31 @@ namespace StaadSteelApp
                         ? SectionManagerService.CoatingExportMode.Galvanizing
                         : SectionManagerService.CoatingExportMode.MassBreakdown;
 
-                    ServiceOperationResult result = SectionManagerService.ExportToExcel(openStaad, mode);
+                    ServiceOperationResult result;
+                    if (mode == SectionManagerService.CoatingExportMode.MassBreakdown)
+                    {
+                        if (!SectionManagerService.TryBuildMassBreakdownSnapshot(
+                                openStaad, out var export, out string selectionError))
+                        {
+                            TopMostMessageBox.ShowError("Could not read STAAD member selection: " + selectionError, "Mass Breakdown");
+                            return;
+                        }
+                        using (var previewForm = new MassBreakdownPreviewForm(export.Stats))
+                        {
+                            previewForm.Text = export.SelectedBeamCount > 0
+                                ? $"Mass Breakdown Preview ({export.SelectedBeamCount} selected beams)"
+                                : "Mass Breakdown Preview (full model)";
+                            if (previewForm.ShowDialog(this) != DialogResult.OK)
+                                return;
+
+                            result = SectionManagerService.ExportToExcel(export, mode, previewForm.CreateOptions());
+                        }
+                    }
+                    else
+                    {
+                        result = SectionManagerService.ExportToExcel(openStaad, mode);
+                    }
+
                     ServiceOperationResultPresenter.Show(result);
                 }
             }
@@ -127,47 +144,6 @@ namespace StaadSteelApp
             }
         }
 
-        private void btnFindReplace_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                if (!TryGetMainOpenStaad(out object openStaad)) return;
-
-                if (!CheckForceExtractionService.TryGetSelectedBeamIds(
-                        openStaad,
-                        out int[] selectedBeams,
-                        out string selectionError))
-                {
-                    TopMostMessageBox.ShowError("Could not read selected beams: " + selectionError, "Check");
-                    return;
-                }
-
-                if (selectedBeams.Length == 0)
-                {
-                    TopMostMessageBox.ShowInfo("No beams selected in STAAD.", "Check");
-                    return;
-                }
-
-                StatusForm.UpdateMessage(
-                    $"Opening Check for {selectedBeams.Length} selected beam(s)...",
-                    "CHECK",
-                    Color.Blue,
-                    1000);
-
-                // CheckForm loads forces lazily for the active member instead of scanning
-                // every selected member before the window can open.
-
-                CheckForm form = new CheckForm();
-
-                form.LoadMembers(selectedBeams, openStaad);
-                form.Show();
-            }
-            catch (Exception ex)
-            {
-                TopMostMessageBox.ShowError("Check Error: " + ex.Message);
-            }
-        }
-
         private void btnRun_Click(object sender, EventArgs e)
         {
             if (_isRunningAnalysis)
@@ -206,6 +182,49 @@ namespace StaadSteelApp
             {
                 btnRun.Enabled = restoreRunEnabled;
                 _isRunningAnalysis = false;
+            }
+        }
+
+        private void btnRatio_Click(object sender, EventArgs e)
+        {
+            if (_isHighlightingRatio)
+            {
+                StatusForm.UpdateMessage("Ratio scan is already running.", "RATIO", Color.DarkOrange, autoHideMs: 1500);
+                return;
+            }
+
+            using (var form = new RatioThresholdForm(0.95))
+            {
+                if (form.ShowDialog(this) != DialogResult.OK)
+                    return;
+
+                if (!TryGetMainOpenStaad(out object openStaad)) return;
+
+                bool restoreRatioEnabled = btnRatio.Enabled;
+                _isHighlightingRatio = true;
+                btnRatio.Enabled = false;
+
+                try
+                {
+                    StatusForm.UpdateMessage(
+                        $"Scanning design ratios >= {form.Threshold:0.###}...",
+                        "RATIO",
+                        Color.Blue,
+                        autoHideMs: 0);
+
+                    ServiceOperationResult result = RatioHighlightService.HighlightByCriticalRatio(openStaad, form.Threshold);
+                    ServiceOperationResultPresenter.Show(result);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Exception("Ratio highlight failed.", ex);
+                    StatusForm.UpdateMessage("Ratio Error: " + ex.Message, "RATIO", Color.DarkRed, autoHideMs: 0);
+                }
+                finally
+                {
+                    btnRatio.Enabled = restoreRatioEnabled;
+                    _isHighlightingRatio = false;
+                }
             }
         }
 

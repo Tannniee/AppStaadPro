@@ -47,7 +47,7 @@ namespace StaadSteelApp.Core
             }
 
             // 3. Prismatic Circle
-            if (info.PropType == eFramePropType.Pipe || info.PropType == eFramePropType.Circle)
+            if (info.PropType == eFramePropType.Circle)
             {
                 return OpenStaadPropertyAdapter.CreatePrismaticCircleProperty(propertyObj, info.H1 / 1000.0, out _);
             }
@@ -55,19 +55,61 @@ namespace StaadSteelApp.Core
             // 4. Prismatic Tee
             if (info.PropType == eFramePropType.T)
             {
+                double stemDepth = info.H1 - info.Tf;
+                if (stemDepth <= 0.0 || info.Tw <= 0.0)
+                    return 0;
+
                 return OpenStaadPropertyAdapter.CreatePrismaticTeeProperty(
                     propertyObj,
                     info.H1 / 1000.0,
                     info.Bf / 1000.0,
+                    stemDepth / 1000.0,
                     info.Tw / 1000.0,
-                    info.Tf / 1000.0,
                     out _
                 );
             }
 
+            // 5. Prismatic Trapezoidal
+            if (info.PropType == eFramePropType.Trapezoidal)
+            {
+                return OpenStaadPropertyAdapter.CreatePrismaticTrapezoidalProperty(
+                    propertyObj,
+                    info.H1 / 1000.0,
+                    info.H2 / 1000.0,
+                    info.Bf / 1000.0,
+                    out _);
+            }
+
+            // 6. Tapered Pipe / Tapered Tube
+            if (info.PropType == eFramePropType.Pipe)
+            {
+                if (info.H1 <= 0.0 || info.H2 <= 0.0 || info.Tw <= 0.0 ||
+                    (2.0 * info.Tw) >= Math.Min(info.H1, info.H2))
+                {
+                    return 0;
+                }
+
+                int tubeType = GetTaperedTubeCreateType(info.TaperedTubeShape);
+
+                return OpenStaadPropertyAdapter.CreateTaperedTubeProperty(
+                    propertyObj,
+                    tubeType,
+                    info.H1 / 1000.0,
+                    info.H2 / 1000.0,
+                    info.Tw / 1000.0,
+                    out _);
+            }
+
+            if (info.PropType == eFramePropType.General)
+            {
+                throw new SectionPropertyException(
+                    "Prismatic General requires Ax, Ay, Az, Ix, Iy, Iz, YD, ZD, YB, and ZB. " +
+                    "Use Create as UPT > GENERAL, or reuse an existing equivalent property.");
+            }
+
             bool hasTypeSpec = info.LegacyTypeSpec != 0;
 
-            // 5. Standard Table Logic (for Legacy only)
+            // 7. Standard Table Logic (for Legacy only)
             if (!hasTypeSpec)
             {
                 int existingID = checkPropertyExists(os, info.Name);
@@ -92,6 +134,22 @@ namespace StaadSteelApp.Core
                     info.Name
                 );
                 if (newID_Tube > 0) return newID_Tube;
+
+                double tubeThicknessMm = info.Tf > 0.0 ? info.Tf : info.Tw;
+                double tubeDepthMm = info.H1;
+                double tubeWidthMm = info.H2 > 0.0 ? info.H2 : info.Bf;
+                if (tubeThicknessMm > 0.0 && tubeDepthMm > 0.0 && tubeWidthMm > 0.0 &&
+                    (2.0 * tubeThicknessMm) < Math.Min(tubeDepthMm, tubeWidthMm))
+                {
+                    int userDefinedTubeId = OpenStaadPropertyAdapter.CreateUserDefinedTubePropertyFromTable(
+                        propertyObj,
+                        countryCode,
+                        tubeThicknessMm / 1000.0,
+                        tubeWidthMm / 1000.0,
+                        tubeDepthMm / 1000.0,
+                        out _);
+                    if (userDefinedTubeId > 0) return userDefinedTubeId;
+                }
             }
             else if (IsAngleShape(shapeName, info.Name))
             {
@@ -150,6 +208,17 @@ namespace StaadSteelApp.Core
             if (newID_Std > 0) return newID_Std;
 
             return 0;
+        }
+
+        internal static int GetTaperedTubeCreateType(TaperedTubeShape shape)
+        {
+            if (shape == TaperedTubeShape.Round)
+                return 0;
+
+            if (shape == TaperedTubeShape.Square)
+                return 5;
+
+            throw new SectionPropertyException("Select Tapered Pipe or Tapered Tube before creating the section.");
         }
 
         private static int TryCreateWithFallback(Func<string, int> create, string name)

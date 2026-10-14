@@ -12,14 +12,14 @@ namespace StaadSteelApp
         private readonly Button _btnPreview;
         private AdvanceUptConversionPreview _preview;
 
-        public override string ActionText => "Convert legacy Pipe/Tube to UPT";
+        public override string ActionText => "Convert Pipe/Tube to UPT";
         public override string ApplyText => "Convert";
         public override bool UsesNodeSelection => false;
 
         public ConvertUptPanel()
         {
             AddLabel(this, "_lblConvertUptScope", "Scope", 2, 8);
-            AddLabel(this, "_lblConvertUptScopeValue", "Whole model legacy Pipe/Tube", 60, 8, 166);
+            AddLabel(this, "_lblConvertUptScopeValue", "Legacy + uniform Tapered", 60, 8, 166);
             _btnPreview = AddButton(this, "_btnConvertUptPreview", "Preview", 246, 3, BtnPreview_Click);
 
             _txtPreview = new TextBox
@@ -40,12 +40,12 @@ namespace StaadSteelApp
         public override AdvanceActionHint GetHint()
         {
             if (_preview == null)
-                return Info("Run Preview to detect whole-model legacy Pipe/Tube sections before conversion.");
+                return Info("Run Preview to detect legacy Pipe/Tube and uniform Tapered Pipe/Tube sections.");
 
             if (_preview.EligibleGroupCount == 0)
-                return Error("Preview found no legacy Pipe/Tube sections to convert.");
+                return Error("Preview found no supported Pipe/Tube sections to convert.");
 
-            return Info($"Preview ready: {_preview.EligibleMemberCount} members across {_preview.EligibleGroupCount} groups.");
+            return Info($"Preview ready: {_preview.EligibleMemberCount} members across {_preview.EligibleGroupCount} section/Material groups.");
         }
 
         public override bool Apply()
@@ -58,13 +58,13 @@ namespace StaadSteelApp
 
             if (_preview.EligibleGroupCount == 0)
             {
-                Context.ShowWarning("Preview found no legacy Pipe/Tube sections to convert.");
+                Context.ShowWarning("Preview found no supported Pipe/Tube sections to convert.");
                 return false;
             }
 
             DialogResult confirm = TopMostMessageBox.Show(
                 FindForm(),
-                $"Convert {_preview.EligibleMemberCount} members across {_preview.EligibleGroupCount} groups to UPT?",
+                $"Convert {_preview.EligibleMemberCount} members across {_preview.EligibleGroupCount} groups to UPT?\nEach member keeps its current Material.",
                 "Convert UPT",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question);
@@ -90,7 +90,7 @@ namespace StaadSteelApp
         {
             _btnPreview.Enabled = false;
             Cursor = Cursors.AppStarting;
-            StatusForm.UpdateMessage("Scanning legacy Pipe/Tube sections...", "Convert UPT", Color.Blue, autoHideMs: 0);
+            StatusForm.UpdateMessage("Scanning Pipe/Tube sections...", "Convert UPT", Color.Blue, autoHideMs: 0);
 
             try
             {
@@ -105,7 +105,7 @@ namespace StaadSteelApp
 
                 _preview = preview;
                 _txtPreview.Text = message;
-                Context.ShowSuccess($"Preview complete. Eligible groups: {_preview.EligibleGroupCount}, members: {_preview.EligibleMemberCount}.");
+                Context.ShowSuccess($"Preview complete. Eligible section/Material groups: {_preview.EligibleGroupCount}; members: {_preview.EligibleMemberCount}.");
             }
             catch (Exception ex)
             {

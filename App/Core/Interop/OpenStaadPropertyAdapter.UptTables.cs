@@ -50,7 +50,33 @@ namespace StaadSteelApp.Core.Interop
         internal static bool TryCreateUPTTableEx(object propertyObj, int tableId, int sectionType, out string error)
         {
             error = string.Empty;
-            return ComInvoke.TryInvoke(propertyObj, "CreateUPTTableEx", out _, out error, new object[] { tableId, sectionType });
+            if (!ComInvoke.TryInvoke(
+                    propertyObj,
+                    "CreateUPTTableEx",
+                    out object result,
+                    out error,
+                    new object[] { tableId, sectionType }))
+            {
+                return false;
+            }
+
+            if (result is bool boolResult)
+            {
+                if (boolResult)
+                    return true;
+
+                error = "OpenSTAAD returned False.";
+                return false;
+            }
+
+            int createdTableId = ComResult.ToInt32(result);
+            if (createdTableId == tableId)
+                return true;
+
+            error = createdTableId <= 0
+                ? "OpenSTAAD returned 0 instead of a created table ID."
+                : $"OpenSTAAD created table {createdTableId} instead of requested table {tableId}.";
+            return false;
         }
     }
 }

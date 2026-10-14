@@ -36,12 +36,14 @@ namespace StaadSteelApp.Core
 
         public static ServiceOperationResult RemoveSupport_Selected()
         {
-            if (!TryGetSelectedNodeIds(out int[] nodeIds, out string selectionMessage))
-            {
-                return ServiceOperationResult.Info("Support", selectionMessage);
-            }
+            if (!MiscOpenStaadService.TryGetConnection(out StaadConnectionSnapshot connection, out string connectionMessage))
+                return ServiceOperationResult.Error("Support", connectionMessage);
 
-            if (!TryGetSupportObject(out object supportObj, out string supportError))
+            object openStaad = connection.OpenStaad;
+            if (!MiscSelectionService.TryGetSelectedNodeIds(openStaad, out int[] nodeIds, out string selectionMessage))
+                return ServiceOperationResult.Info("Support", selectionMessage);
+
+            if (!TryGetSupportObject(openStaad, out object supportObj, out string supportError))
                 return ServiceOperationResult.Error("Support", supportError);
 
             int removedCount = 0;
@@ -79,7 +81,11 @@ namespace StaadSteelApp.Core
 
         public static ServiceOperationResult ApplyFixedBut_Selected(int[] releaseSpec, double[] springSpec)
         {
-            if (!TryGetSelectedNodeIds(out int[] nodeIds, out string selectionMessage))
+            if (!MiscOpenStaadService.TryGetConnection(out StaadConnectionSnapshot connection, out string connectionMessage))
+                return ServiceOperationResult.Error("Fixed But", connectionMessage);
+
+            object openStaad = connection.OpenStaad;
+            if (!MiscSelectionService.TryGetSelectedNodeIds(openStaad, out int[] nodeIds, out string selectionMessage))
             {
                 return ServiceOperationResult.Info("Support", selectionMessage);
             }
@@ -95,7 +101,7 @@ namespace StaadSteelApp.Core
                     "Please define at least one release or spring stiffness.");
             }
 
-            if (!TryGetSupportObject(out object supportObj, out string supportError))
+            if (!TryGetSupportObject(openStaad, out object supportObj, out string supportError))
                 return ServiceOperationResult.Error("Fixed But", supportError);
 
             int supportId = FindExistingSupportId(
@@ -128,12 +134,14 @@ namespace StaadSteelApp.Core
 
         private static ServiceOperationResult ApplySimpleSupportToSelectedNodes(int supportType, string title)
         {
-            if (!TryGetSelectedNodeIds(out int[] nodeIds, out string selectionMessage))
-            {
-                return ServiceOperationResult.Info(title, selectionMessage);
-            }
+            if (!MiscOpenStaadService.TryGetConnection(out StaadConnectionSnapshot connection, out string connectionMessage))
+                return ServiceOperationResult.Error(title, connectionMessage);
 
-            if (!TryGetSupportObject(out object supportObj, out string supportError))
+            object openStaad = connection.OpenStaad;
+            if (!MiscSelectionService.TryGetSelectedNodeIds(openStaad, out int[] nodeIds, out string selectionMessage))
+                return ServiceOperationResult.Info(title, selectionMessage);
+
+            if (!TryGetSupportObject(openStaad, out object supportObj, out string supportError))
                 return ServiceOperationResult.Error(title, supportError);
 
             int supportId = FindExistingSupportId(supportObj, supportType, desiredStates: null, desiredSprings: null);
@@ -223,21 +231,9 @@ namespace StaadSteelApp.Core
             return ServiceOperationResult.Warning(actionName, message.ToString().Trim());
         }
 
-        private static bool TryGetSelectedNodeIds(out int[] nodeIds, out string message)
-        {
-            return MiscSelectionService.TryGetSelectedNodeIds(out nodeIds, out message);
-        }
-
-        private static bool TryGetSupportObject(out object supportObj, out string error)
+        private static bool TryGetSupportObject(object openStaad, out object supportObj, out string error)
         {
             supportObj = null;
-            if (!StaadManager.TryGetOpenSTAAD(out object openStaad, out string connectionError))
-            {
-                Debug.WriteLine(connectionError);
-                error = connectionError;
-                return false;
-            }
-
             if (OpenStaadSupportAdapter.TryGetSupportObject(openStaad, out supportObj, out error))
                 return true;
 

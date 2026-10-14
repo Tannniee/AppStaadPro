@@ -19,9 +19,56 @@ namespace StaadSteelApp.Core.Interop
             return InvokeInt(propertyObj, "CreatePrismaticCircleProperty", out error, diameter);
         }
 
-        internal static int CreatePrismaticTeeProperty(object propertyObj, double depth, double width, double webThickness, double flangeThickness, out string error)
+        internal static int CreatePrismaticTeeProperty(
+            object propertyObj,
+            double totalDepth,
+            double flangeWidth,
+            double stemDepth,
+            double stemWidth,
+            out string error)
         {
-            return InvokeInt(propertyObj, "CreatePrismaticTeeProperty", out error, depth, width, webThickness, flangeThickness);
+            return InvokeInt(
+                propertyObj,
+                "CreatePrismaticTeeProperty",
+                out error,
+                totalDepth,
+                flangeWidth,
+                stemDepth,
+                stemWidth);
+        }
+
+        internal static int CreatePrismaticTrapezoidalProperty(
+            object propertyObj,
+            double depth,
+            double topWidth,
+            double bottomWidth,
+            out string error)
+        {
+            return InvokeInt(
+                propertyObj,
+                "CreatePrismaticTrapezoidalProperty",
+                out error,
+                depth,
+                topWidth,
+                bottomWidth);
+        }
+
+        internal static int CreateTaperedTubeProperty(
+            object propertyObj,
+            int tubeType,
+            double startDepth,
+            double endDepth,
+            double thickness,
+            out string error)
+        {
+            return InvokeInt(
+                propertyObj,
+                "CreateTaperedTubeProperty",
+                out error,
+                tubeType,
+                startDepth,
+                endDepth,
+                thickness);
         }
 
         internal static int CreatePipePropertyFromTable(object propertyObj, int countryCode, string sectionName, out string error)
@@ -32,6 +79,28 @@ namespace StaadSteelApp.Core.Interop
         internal static int CreateTubePropertyFromTable(object propertyObj, int countryCode, string sectionName, out string error)
         {
             return InvokeInt(propertyObj, "CreateTubePropertyFromTable", out error, countryCode, sectionName, 0, 0.0, 0.0, 0.0);
+        }
+
+        internal static int CreateUserDefinedTubePropertyFromTable(
+            object propertyObj,
+            int countryCode,
+            double thickness,
+            double width,
+            double depth,
+            out string error)
+        {
+            // OSAPP: TypeSpec -1 creates a user-defined tube. Additional
+            // specifications are TH/WT/DT: thickness, width and depth.
+            return InvokeInt(
+                propertyObj,
+                "CreateTubePropertyFromTable",
+                out error,
+                countryCode,
+                string.Empty,
+                -1,
+                thickness,
+                width,
+                depth);
         }
 
         internal static int CreateAnglePropertyFromTable(object propertyObj, int countryCode, string sectionName, int typeSpec, double spacing, out string error)

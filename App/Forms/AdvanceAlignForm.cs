@@ -29,7 +29,8 @@ namespace StaadSteelApp
             {
                 GetSelectedNodes = () => _selectedNodes.ToArray(),
                 ReloadSelection = ReloadSelection,
-                UpdateHint = UpdateHint
+                UpdateHint = UpdateHint,
+                UpdateActionUi = UpdateActionUi
             };
 
             RegisterActionPanels();
@@ -48,6 +49,7 @@ namespace StaadSteelApp
             _actionPanels.Clear();
             _actionPanels.Add(new LineAlignPanel());
             _actionPanels.Add(new TemplateAlignPanel());
+            _actionPanels.Add(new ElevationVectorAlignPanel());
             _actionPanels.Add(new ConnectNodesPanel());
             _actionPanels.Add(new BeamSegmentPanel());
             _actionPanels.Add(new FrameMovePanel());
@@ -106,6 +108,32 @@ namespace StaadSteelApp
         {
             _selectionSyncTimer.Stop();
             SaveWindowPosition();
+        }
+
+        internal void HandleActiveModelChanged(bool connected)
+        {
+            _selectionSyncTimer.Stop();
+            _selectedNodes = Array.Empty<int>();
+
+            foreach (IAdvanceActionPanel panel in _actionPanels)
+                panel.View.Dispose();
+
+            _panelActionHost?.Dispose();
+            RegisterActionPanels();
+            InitializeActionHost();
+            SelectDefaultAction();
+            _actionContext.CoordinateUnitLabel = connected
+                ? AdvanceService.GetCoordinateLengthUnitLabel()
+                : "?";
+            foreach (IAdvanceActionPanel panel in _actionPanels)
+                panel.AttachContext(_actionContext);
+
+            ApplySelectionToUi();
+            UpdateActionUi();
+            if (connected)
+                ReloadSelection();
+            if (Visible && !IsDisposed)
+                _selectionSyncTimer.Start();
         }
 
         private void RestoreWindowPosition()
@@ -271,6 +299,9 @@ namespace StaadSteelApp
             IAdvanceActionPanel current = GetCurrentActionPanel();
             if (current == null)
                 return;
+
+            if (current.UsesNodeSelection)
+                SyncSelection(showErrors: true, forceRefresh: true);
 
             current.Apply();
             UpdateHint();

@@ -98,18 +98,17 @@ namespace StaadSteelApp.Core
                      info.Bf = arrProps[2]; // ID
                      info.UptAy = arrProps[3];
                      info.UptAz = arrProps[4];
+                     info.UptIz = arrProps[5];
+                     info.UptIy = arrProps[6];
+                     info.UptIx = arrProps[7];
                      info.Tw = (arrProps[1] - arrProps[2]) / 2.0; // Tw = (OD - ID) / 2
                      break;
 
                  // --- PRISMATIC CIRCLE ---
                  case 671: // scPrismaticCircle
                      info.PropType = eFramePropType.Circle;
-                     // arrProps[0] is Area (AX), calculate diameter: D = 2 * sqrt(A/PI)
-                     double area = arrProps[0];
-                     if (area > 0)
-                         info.H1 = 2.0 * Math.Sqrt(area / Math.PI);
-                     else
-                         info.H1 = arrProps[1]; // Fallback
+                     // Ax Iz Iy Ix YD
+                     info.H1 = arrProps[4];
                      break;
 
                  // --- LEGACY I / W SHAPE (from standard table) ---
@@ -141,8 +140,8 @@ namespace StaadSteelApp.Core
                     info.UptIx = arrProps[7];
                     info.UptAy = arrProps[8];
                     info.UptAz = arrProps[9];
-                    info.Bfb = arrProps[3];
-                    info.Tfb = arrProps[4];
+                    info.Bfb = arrProps[10] > 0.0 ? arrProps[10] : arrProps[3];
+                    info.Tfb = arrProps[11] > 0.0 ? arrProps[11] : arrProps[4];
                     break;
 
                  // --- UPT ISECTION ---
@@ -158,6 +157,7 @@ namespace StaadSteelApp.Core
                     info.Tfb = arrProps[6]; // Tff1
                     info.UptAy = arrProps[7];
                     info.UptAz = arrProps[8];
+                    info.UptXif = arrProps[9];
                     break;
 
                  // --- LEGACY TEE (from standard table) ---
@@ -181,6 +181,7 @@ namespace StaadSteelApp.Core
                     info.UptIz = arrProps[5];
                     info.UptIy = arrProps[6];
                     info.UptIx = arrProps[7];
+                    info.UptCy = arrProps[8];
                     info.UptAy = arrProps[9];
                     info.UptAz = arrProps[10];
                     break;
@@ -188,13 +189,11 @@ namespace StaadSteelApp.Core
                  // --- PRISMATIC TEE ---
                  case 673: // scPrismaticTee
                      info.PropType = eFramePropType.T;
-                     // Prismatic Tee stores section properties rather than explicit tee dimensions.
-                     // Preserve a deterministic estimate so detect/paste stays usable without inventing exact geometry.
-                     double teeArea = arrProps[0];
-                     info.H1 = Math.Sqrt(teeArea) * 2; // Approximate depth
-                     info.Bf = Math.Sqrt(teeArea) * 2; // Approximate width
-                     info.Tw = Math.Sqrt(teeArea) * 0.1; // Approximate stem
-                     info.Tf = Math.Sqrt(teeArea) * 0.1; // Approximate flange
+                     // Ax Iz Iy Ix YD ZD YB ZB
+                     info.H1 = arrProps[4]; // Total depth
+                     info.Bf = arrProps[5]; // Flange width
+                     info.Tf = Math.Max(0.0, arrProps[4] - arrProps[6]); // Flange thickness
+                     info.Tw = arrProps[7]; // Stem width
                      break;
 
                  // --- LEGACY CHANNEL ---
@@ -218,6 +217,7 @@ namespace StaadSteelApp.Core
                     info.UptIz = arrProps[5];
                     info.UptIy = arrProps[6];
                     info.UptIx = arrProps[7];
+                    info.UptCz = arrProps[8];
                     info.UptAy = arrProps[9];
                     info.UptAz = arrProps[10];
                     break;
@@ -238,8 +238,9 @@ namespace StaadSteelApp.Core
                     info.Bf = arrProps[2]; // Wf
                     info.Tf = arrProps[3]; // Tf
                     info.Tw = arrProps[3]; // Tw
-                    info.UptAy = arrProps[4];
-                    info.UptAz = arrProps[5];
+                    info.UptR = arrProps[4];
+                    info.UptAy = arrProps[5];
+                    info.UptAz = arrProps[6];
                     break;
 
                  // --- LEGACY TUBE (from standard table) ---
@@ -307,39 +308,42 @@ namespace StaadSteelApp.Core
                  // --- PRISMATIC RECTANGLE / TAPERED TUBE ---
                  case 672: // scPrismaticRectangle
                      info.PropType = eFramePropType.Rectangular;
-                     // STAAD names Prismatic Rectangle as "Rect YDxZD" (e.g., "Rect 0.30x0.30")
-                     // Parse dimensions from name instead of calculating from I values
-                     double parsedYD = 0, parsedZD = 0;
-                     if (!string.IsNullOrEmpty(propName))
-                     {
-                         // Try to parse "Rect 0.30x0.30" format
-                         var match = System.Text.RegularExpressions.Regex.Match(
-                             propName, @"(\d+\.?\d*)\s*[xX]\s*(\d+\.?\d*)");
-                         if (match.Success)
-                         {
-                             double.TryParse(match.Groups[1].Value, out parsedYD);
-                             double.TryParse(match.Groups[2].Value, out parsedZD);
-                         }
-                     }
+                     // Ax Iz Iy Ix YD ZD
+                     info.H1 = arrProps[4];
+                     info.H2 = arrProps[5];
+                     break;
 
-                     if (parsedYD > 0 && parsedZD > 0)
-                     {
-                         info.H1 = parsedYD; // Already in meters from name
-                         info.H2 = parsedZD;
-                     }
-                     else
-                     {
-                         // Fallback: use sqrt(Area) for both (assume square)
-                         double rectArea = arrProps[0];
-                         info.H1 = info.H2 = Math.Sqrt(rectArea > 0 ? rectArea : 0);
-                     }
+                 case 674: // scPrismaticTrapezoidal
+                     info.PropType = eFramePropType.Trapezoidal;
+                     // Ax Iz Iy Ix YD ZD ZB
+                     info.H1 = arrProps[4];
+                     info.H2 = arrProps[5]; // Top width
+                     info.Bf = arrProps[6]; // Bottom width
                      break;
 
                  case 675: // scTaperedTube
-                     info.PropType = eFramePropType.Rectangular;
-                     info.H1 = arrProps[1]; // d1
-                     info.H2 = arrProps[2]; // d2
-                     info.Tw = arrProps[3]; // th
+                     info.PropType = eFramePropType.Pipe;
+                     // Ax Iz Iy Ix D1 D2 TH SECTION_TYPE
+                     info.H1 = arrProps[4]; // d1
+                     info.H2 = arrProps[5]; // d2
+                     info.Tw = arrProps[6]; // th
+                     int taperedTubeSectionType = (int)Math.Round(arrProps[7]);
+                     info.TaperedTubeShape = GetTaperedTubeShapeFromReadType(taperedTubeSectionType);
+                     break;
+
+                 case 676: // scPrismaticGeneral
+                     info.PropType = eFramePropType.General;
+                     // Ax Ay Az Ix Iy Iz YD ZD YB ZB
+                     info.UptAx = arrProps[0];
+                     info.UptAy = arrProps[1];
+                     info.UptAz = arrProps[2];
+                     info.UptIx = arrProps[3];
+                     info.UptIy = arrProps[4];
+                     info.UptIz = arrProps[5];
+                     info.H1 = arrProps[6];
+                     info.H2 = arrProps[7];
+                     info.Tw = arrProps[8];
+                     info.Bf = arrProps[9];
                      break;
 
                  // --- DOUBLE ANGLE ---
@@ -352,8 +356,9 @@ namespace StaadSteelApp.Core
                     info.UptIz = arrProps[5];
                     info.UptIy = arrProps[6];
                     info.UptIx = arrProps[7];
-                    info.UptAy = arrProps[8];
-                    info.UptAz = arrProps[9];
+                    info.UptCy = arrProps[8];
+                    info.UptAy = arrProps[9];
+                    info.UptAz = arrProps[10];
                     break;
 
                  default:
@@ -409,6 +414,20 @@ namespace StaadSteelApp.Core
              }
 
              return info;
+        }
+
+        internal static TaperedTubeShape GetTaperedTubeShapeFromReadType(int sectionType)
+        {
+            // GetSectionPropertyValuesEx is one-based: 1 = Round, 6 = Square.
+            if (sectionType == 1)
+                return TaperedTubeShape.Round;
+
+            if (sectionType == 6)
+                return TaperedTubeShape.Square;
+
+            throw new SectionPropertyException(
+                $"Tapered tube subtype {sectionType} is not supported. " +
+                "Only Round and Square are available in this app.");
         }
 
     }

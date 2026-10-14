@@ -7,7 +7,10 @@ namespace StaadSteelApp.Core
 {
     public static partial class SectionService
     {
-        public static SectionAssignmentResult AssignSectionToSelection(object os, SectionInfo info)
+        public static SectionAssignmentResult AssignSectionToSelection(
+            object os,
+            SectionInfo info,
+            SectionTransferContext transferContext = null)
         {
              if (os == null)
                  return SectionAssignmentResult.Error("Assignment Error", "Not connected to STAAD.");
@@ -22,7 +25,7 @@ namespace StaadSteelApp.Core
                  return SectionAssignmentResult.Warning("Check Selection", "Could not read selected beams: " + geometryError);
              }
 
-             int[] arrBeams = GetSelectedBeamIDs(geometryObj);
+             int[] arrBeams = GetSelectedBeamIDs(geometryObj, out string selectionWarning);
              int selectedMemberCount = arrBeams.Length;
              bool selectedPhysicalMembers = TryGetSelectedPhysicalMemberCount(geometryObj, out int physicalMemberCount);
              if (selectedPhysicalMembers)
@@ -30,17 +33,34 @@ namespace StaadSteelApp.Core
              
              if (arrBeams.Length == 0)
              {
-                 return SectionAssignmentResult.Warning("Check Selection", "No beams selected in STAAD. Please select beams first.");
+                 string selectionDetail = string.IsNullOrWhiteSpace(selectionWarning)
+                     ? "No beams selected in STAAD. Please select beams first."
+                     : "No valid analytical beams were found in the STAAD selection.\n" + selectionWarning;
+                 return SectionAssignmentResult.Warning("Check Selection", selectionDetail);
              }
 
-             // 2. Resolve property ID safely for current model:
-             // copied PropertyRefNo can be stale across files/sessions.
-             int propID = ResolveTargetPropertyId(os, info);
+             TargetPropertyResolution resolution;
+             try
+             {
+                 resolution = ResolveTargetProperty(os, info, transferContext);
+             }
+             catch (Exception ex)
+             {
+                 AppLogger.Exception("Error resolving destination section property.", ex);
+                 return SectionAssignmentResult.Error(
+                     "Creation Failed",
+                     $"Could not create or find an equivalent property for '{info.Name}'.\n{ex.Message}");
+             }
 
+             int propID = resolution.PropertyId;
              if (propID <= 0)
              {
-                 string reason = propID < 0 ? $" (Error {propID})" : "";
-                 return SectionAssignmentResult.Error("Creation Failed", $"Could not create or find property '{info.Name}'{reason}.");
+                 string detail = string.IsNullOrWhiteSpace(resolution.ErrorMessage)
+                     ? "No equivalent destination property was found or created."
+                     : resolution.ErrorMessage;
+                 return SectionAssignmentResult.Error(
+                     "Creation Failed",
+                     $"Could not create or find an equivalent property for '{info.Name}'.\n{detail}");
              }
 
              // 3. Assign
@@ -56,7 +76,7 @@ namespace StaadSteelApp.Core
                  {
                      return SectionAssignmentResult.Error(
                          "Assignment Error",
-                         $"Failed to assign property '{info.Name}' (ID: {propID}) to selected beams.\n{assignError}");
+                         $"Failed to assign property '{resolution.PropertyName}' (ID: {propID}) to selected beams.\n{assignError}");
                  }
 
                  UpdateUsedSectionsCacheAfterAssignment(os, arrBeams, propID);
@@ -70,21 +90,22 @@ namespace StaadSteelApp.Core
                  }
                  
                  // If we get here, it didn't throw.
-                 string materialText = "STEEL"; 
+                 string materialText = "Not changed";
                  if (!string.IsNullOrWhiteSpace(mat) && !mat.Equals("None", StringComparison.OrdinalIgnoreCase))
                  {
                      materialText = mat;
                      if (!materialAssigned) materialText += $" (Error: {materialError})";
                  }
                  
-                 string msg = BuildSectionAssignmentMessage(info.Name, propID, selectedMemberCount, selectedPhysicalMembers, arrBeams.Length, materialText);
-                 if (!verified)
-                 {
-                     Debug.WriteLine(
-                         string.IsNullOrWhiteSpace(assignError)
-                             ? $"AssignBeamProperty accepted for property {propID}, but read-back did not confirm immediately."
-                             : $"AssignBeamProperty accepted for property {propID}, but read-back did not confirm immediately: {assignError}");
-                 }
+                 string msg = BuildSectionAssignmentMessage(
+                     resolution.PropertyName,
+                     propID,
+                     selectedMemberCount,
+                     selectedPhysicalMembers,
+                     arrBeams.Length,
+                     materialText,
+                     resolution.Description,
+                     selectionWarning);
 
                  return SectionAssignmentResult.Success("Successfully Assigned", msg, propID, arrBeams.Length);
              }
@@ -164,7 +185,9 @@ namespace StaadSteelApp.Core
             int selectedMemberCount,
             bool selectedPhysicalMembers,
             int analyticalBeamCount,
-            string materialText)
+            string materialText,
+            string resolutionDescription,
+            string selectionWarning)
         {
             string selectionLine = selectedPhysicalMembers
                 ? $"- {selectedMemberCount} selected physical member(s)"
@@ -174,7 +197,15 @@ namespace StaadSteelApp.Core
                 ? $"- {analyticalBeamCount} analytical beam(s) assigned"
                 : $"- {analyticalBeamCount} beam(s) assigned";
 
-            return $"- {sectionName} (ID: {propID})\n{selectionLine}\n{assignedLine}\n- Material: {materialText}";
+            string resolutionLine = string.IsNullOrWhiteSpace(resolutionDescription)
+                ? string.Empty
+                : "\n- " + resolutionDescription;
+
+            string selectionWarningLine = string.IsNullOrWhiteSpace(selectionWarning)
+                ? string.Empty
+                : "\n- Selection note: " + selectionWarning;
+
+            return $"- {sectionName} (ID: {propID}){resolutionLine}\n{selectionLine}\n{assignedLine}\n- Material: {materialText}{selectionWarningLine}";
         }
 
         private static bool TryAssignPropertyToMembers(object propObj, int[] beams, int propID, out string error, out bool verified)
@@ -192,7 +223,8 @@ namespace StaadSteelApp.Core
             if (!bulkAccepted)
                 error = "Bulk AssignBeamProperty failed: " + bulkError;
 
-            if (VerifyAssignedProperty(propObj, beams, propID, attempts: 4, delayMs: 50, maxChecks: 3))
+            int verificationChecks = beams.Length <= 50 ? beams.Length : 12;
+            if (VerifyAssignedProperty(propObj, beams, propID, attempts: 6, delayMs: 100, maxChecks: verificationChecks))
             {
                 verified = true;
                 return true;
@@ -200,7 +232,6 @@ namespace StaadSteelApp.Core
 
             // Fallback: assign one-by-one for COM builds that reject array variants.
             int attempted = 0;
-            int failed = 0;
             foreach (int beam in beams)
             {
                 if (OpenStaadPropertyAdapter.TryAssignBeamProperty(propObj, beam, propID, out string singleError))
@@ -209,63 +240,24 @@ namespace StaadSteelApp.Core
                     continue;
                 }
 
-                failed++;
                 Debug.WriteLine($"AssignBeamProperty failed for beam {beam}: {singleError}");
                 if (string.IsNullOrWhiteSpace(error))
                     error = singleError;
             }
 
-            int verifyChecks = beams.Length <= 12 ? beams.Length : 6;
-            if (attempted == beams.Length && VerifyAssignedProperty(propObj, beams, propID, attempts: 4, delayMs: 50, maxChecks: verifyChecks))
+            if (attempted == beams.Length &&
+                VerifyAssignedProperty(propObj, beams, propID, attempts: 6, delayMs: 100, maxChecks: verificationChecks))
             {
                 verified = true;
                 return true;
             }
 
-            if (bulkAccepted || attempted == beams.Length)
-            {
-                error = "";
-                return true;
-            }
-
             if (string.IsNullOrWhiteSpace(error))
-                error = $"Assignment verification failed after processing {attempted}/{beams.Length} beams.";
+                error = $"OpenSTAAD accepted the assignment command, but read-back did not confirm property {propID} after processing {attempted}/{beams.Length} beams.";
             else
-                error += $" | Assignment verification failed after processing {attempted}/{beams.Length} beams.";
+                error += $" | Read-back did not confirm property {propID} after processing {attempted}/{beams.Length} beams.";
 
             return false;
-        }
-
-        private static int ResolveTargetPropertyId(object os, SectionInfo info)
-        {
-            if (os == null || info == null) return 0;
-
-            // Prefer copied property reference only if it exists in current model.
-            if (info.PropertyRefNo > 0)
-            {
-                object openStaad = os;
-                if (TryGetSectionProperty(openStaad, out object propObj, out string _) &&
-                    TryGetSectionPropertyNameById(propObj, info.PropertyRefNo, out string _))
-                    return info.PropertyRefNo;
-
-                Debug.WriteLine($"PropertyRefNo {info.PropertyRefNo} is not valid in current model. Falling back to name/create.");
-            }
-
-            // Try by name to avoid duplicate create.
-            if (!string.IsNullOrWhiteSpace(info.Name))
-            {
-                try
-                {
-                    int byName = CheckPropertyExists(os, info.Name);
-                    if (byName > 0) return byName;
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"CheckPropertyExists('{info.Name}') failed: {ex.Message}");
-                }
-            }
-
-            return GetOrCreateProperty(os, info);
         }
 
         private static bool TryGetSectionPropertyNameById(object propObj, int propID, out string sectionName)
@@ -280,21 +272,28 @@ namespace StaadSteelApp.Core
             return ok;
         }
 
-        private static int GetOrCreateUPTSection(object os, SectionInfo info)
+        private static int GetOrCreateUPTSection(
+            object os,
+            SectionInfo info,
+            Func<object, string, int> checkPropertyExists = null)
         {
-            Func<object, string, int> checkPropertyExists = CheckPropertyExists;
-            return SectionUptModule.GetOrCreateUPTSection(os, info, checkPropertyExists);
+            Func<object, string, int> checker = checkPropertyExists ?? CheckPropertyExists;
+            return SectionUptModule.GetOrCreateUPTSection(os, info, checker);
         }
 
-        private static int GetOrCreateProperty(object os, SectionInfo info)
+        private static int GetOrCreateProperty(
+            object os,
+            SectionInfo info,
+            Func<object, string, int> checkPropertyExists = null)
         {
-            Func<object, SectionInfo, int> getOrCreateUPTSection = (model, section) => GetOrCreateUPTSection(model, section);
-            Func<object, string, int> checkPropertyExists = CheckPropertyExists;
+            Func<object, string, int> checker = checkPropertyExists ?? CheckPropertyExists;
+            Func<object, SectionInfo, int> getOrCreateUPTSection =
+                (model, section) => GetOrCreateUPTSection(model, section, checker);
             return SectionPropertyCreateModule.GetOrCreateProperty(
                 os,
                 info,
                 getOrCreateUPTSection,
-                checkPropertyExists);
+                checker);
         }
 
         private static int CheckPropertyExists(object os, string name)

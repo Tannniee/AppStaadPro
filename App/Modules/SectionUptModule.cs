@@ -25,13 +25,14 @@ namespace StaadSteelApp.Core
                     throw new SectionPropertyException($"Cannot create UPT for property type {info.PropType}");
             }
 
-            int tableId = GetOrCreateUPTTableId(os, tableType);
             if (!OpenStaadPropertyAdapter.TryGetPropertyObject(os, out object propertyObj, out string propertyError))
                 throw new SectionPropertyException(propertyError);
 
-            // Check if name already exists
+            // Reuse an existing property before scanning or creating UPT tables.
             int existingProperty = checkPropertyExists(os, info.Name);
             if (existingProperty > 0) return existingProperty;
+
+            int tableId = GetOrCreateUPTTableId(os, tableType);
 
             // Dimensions to meters
             double Wf = info.Bf / 1000.0;
@@ -58,21 +59,49 @@ namespace StaadSteelApp.Core
                 case 1: // WIDE FLANGE
                     if (D <= 0.0 || Tw <= 0.0 || Wf <= 0.0 || Tf <= 0.0)
                         throw new SectionPropertyException($"UPT WIDE FLANGE '{info.Name}' requires D/TW/WF/TF > 0.");
-                    double wideWebH = Math.Max(D - (2.0 * Tf), 0.0);
-                    double wideArea = (2.0 * Wf * Tf) + (wideWebH * Tw);
-                    double wideIzApprox = (2.0 * Wf * Math.Pow(Tf, 3) + wideWebH * Math.Pow(Tw, 3)) / 3.0;
-                    double wideIyApprox = (2.0 * Tf * Math.Pow(Wf, 3) + wideWebH * Math.Pow(Tw, 3)) / 12.0;
+                    if (Wf1 <= 0.0 || Tf1 <= 0.0)
+                        throw new SectionPropertyException($"UPT WIDE FLANGE '{info.Name}' requires WF1/TF1 > 0.");
+                    double wideWebH = Math.Max(D - Tf - Tf1, 0.0);
+                    double wideArea = (Wf * Tf) + (Wf1 * Tf1) + (wideWebH * Tw);
+                    double wideIzApprox = (Wf * Math.Pow(Tf, 3) + Wf1 * Math.Pow(Tf1, 3) + wideWebH * Math.Pow(Tw, 3)) / 3.0;
+                    double wideIyApprox = (Tf * Math.Pow(Wf, 3) + Tf1 * Math.Pow(Wf1, 3) + wideWebH * Math.Pow(Tw, 3)) / 12.0;
+                    double wideBottomArea = Wf1 * Tf1;
+                    double wideWebArea = wideWebH * Tw;
+                    double wideTopArea = Wf * Tf;
+                    double wideBottomY = Tf1 * 0.5;
+                    double wideWebY = Tf1 + (wideWebH * 0.5);
+                    double wideTopY = D - (Tf * 0.5);
+                    double wideYBar = ((wideBottomArea * wideBottomY) + (wideWebArea * wideWebY) + (wideTopArea * wideTopY)) /
+                        Math.Max(wideArea, 1e-12);
                     double wideIxApprox =
-                        (Tw * Math.Pow(wideWebH, 3) / 12.0)
-                        + 2.0 * ((Wf * Math.Pow(Tf, 3) / 12.0) + (Wf * Tf * Math.Pow((D * 0.5) - (Tf * 0.5), 2)));
+                        (Wf1 * Math.Pow(Tf1, 3) / 12.0) + (wideBottomArea * Math.Pow(wideBottomY - wideYBar, 2))
+                        + (Tw * Math.Pow(wideWebH, 3) / 12.0) + (wideWebArea * Math.Pow(wideWebY - wideYBar, 2))
+                        + (Wf * Math.Pow(Tf, 3) / 12.0) + (wideTopArea * Math.Pow(wideTopY - wideYBar, 2));
                     double wideAx = PositiveOrFallback(info.UptAx, wideArea, 1e-12);
                     double wideIz = PositiveOrFallback(info.UptIz, wideIzApprox, 1e-12);
                     double wideIy = PositiveOrFallback(info.UptIy, wideIyApprox, 1e-12);
                     double wideIx = PositiveOrFallback(info.UptIx, wideIxApprox, 1e-12);
                     double wideAy = PositiveOrFallback(info.UptAy, (5.0 / 6.0) * wideAx, 1e-12);
                     double wideAz = PositiveOrFallback(info.UptAz, (5.0 / 6.0) * wideAx, 1e-12);
-                    createResult = OpenStaadPropertyAdapter.AddUPTPropertyWideFlange(propertyObj, tableId, info.Name,
-                        wideAx, D, Tw, Wf, Tf, wideIz, wideIy, wideIx, wideAy, wideAz, out _);
+                    bool useUnequalWideFlangeApi =
+                        Math.Abs(Wf1 - Wf) > 1e-12 ||
+                        Math.Abs(Tf1 - Tf) > 1e-12 ||
+                        (info.PropertyRefNo > 0 && info.Bfb > 0.0 && info.Tfb > 0.0);
+                    if (useUnequalWideFlangeApi)
+                    {
+                        double[] wideProperties =
+                        {
+                            wideAx, D, Tw, Wf, Tf, wideIz, wideIy, wideIx,
+                            wideAy, wideAz, Wf1, Tf1
+                        };
+                        createResult = OpenStaadPropertyAdapter.AddUPTPropertyWideFlangeUnequal(
+                            propertyObj, tableId, info.Name, wideProperties, out _);
+                    }
+                    else
+                    {
+                        createResult = OpenStaadPropertyAdapter.AddUPTPropertyWideFlange(propertyObj, tableId, info.Name,
+                            wideAx, D, Tw, Wf, Tf, wideIz, wideIy, wideIx, wideAy, wideAz, out _);
+                    }
                     break;
                 case 2: // CHANNEL
                     if (D <= 0.0 || Tw <= 0.0 || Wf <= 0.0 || Tf <= 0.0)
@@ -91,16 +120,22 @@ namespace StaadSteelApp.Core
                     double channelAy = PositiveOrFallback(info.UptAy, (5.0 / 6.0) * channelAx, 1e-12);
                     double channelAz = PositiveOrFallback(info.UptAz, (5.0 / 6.0) * channelAx, 1e-12);
                     createResult = OpenStaadPropertyAdapter.AddUPTPropertyChannel(propertyObj, tableId, info.Name,
-                        channelAx, D, Tw, Wf, Tf, channelIz, channelIy, channelIx, 0.0, channelAy, channelAz, out _);
+                        channelAx, D, Tw, Wf, Tf, channelIz, channelIy, channelIx, info.UptCz, channelAy, channelAz, out _);
                     break;
                 case 3: // ANGLE
                     if (D <= 0.0 || Wf <= 0.0 || Tf <= 0.0)
                         throw new SectionPropertyException($"UPT ANGLE '{info.Name}' requires D/WF/TF > 0.");
+                    if (Tf >= Math.Min(D, Wf))
+                        throw new SectionPropertyException($"UPT ANGLE '{info.Name}' requires TF < min(D,WF).");
                     double angleArea = Tf * Math.Max((D + Wf - Tf), 0.0);
+                    double angleR = PositiveOrFallback(
+                        info.UptR,
+                        ComputeAnglePrincipalRadiusOfGyration(D, Wf, Tf),
+                        1e-12);
                     double angleAy = PositiveOrFallback(info.UptAy, 0.5 * angleArea, 1e-12);
                     double angleAz = PositiveOrFallback(info.UptAz, 0.5 * angleArea, 1e-12);
                     createResult = OpenStaadPropertyAdapter.AddUPTPropertyAngle(propertyObj, tableId, info.Name,
-                        D, Wf, Tf, 0.0, angleAy, angleAz, out _);
+                        D, Wf, Tf, angleR, angleAy, angleAz, out _);
                     break;
                 case 4: // DOUBLE ANGLE
                     if (D <= 0.0 || Wf <= 0.0 || Tf <= 0.0)
@@ -114,7 +149,7 @@ namespace StaadSteelApp.Core
                     double dblAngleAy = PositiveOrFallback(info.UptAy, 0.5 * dblAngleArea, 1e-12);
                     double dblAngleAz = PositiveOrFallback(info.UptAz, 0.5 * dblAngleArea, 1e-12);
                     createResult = OpenStaadPropertyAdapter.AddUPTPropertyDoubleAngle(propertyObj, tableId, info.Name,
-                        D, Wf, Tf, spc, dblAngleIz, dblAngleIy, dblAngleIx, 0.0, dblAngleAy, dblAngleAz, out _);
+                        D, Wf, Tf, spc, dblAngleIz, dblAngleIy, dblAngleIx, info.UptCy, dblAngleAy, dblAngleAz, out _);
                     break;
                 case 5: // TEE
                     if (D <= 0.0 || Wf <= 0.0 || Tf <= 0.0 || Tw <= 0.0)
@@ -136,7 +171,7 @@ namespace StaadSteelApp.Core
                     double teeAy = PositiveOrFallback(info.UptAy, (5.0 / 6.0) * teeAx, 1e-12);
                     double teeAz = PositiveOrFallback(info.UptAz, (5.0 / 6.0) * teeAx, 1e-12);
                     createResult = OpenStaadPropertyAdapter.AddUPTPropertyTee(propertyObj, tableId, info.Name,
-                        teeAx, D, Wf, Tf, Tw, teeIz, teeIy, teeIx, 0.0, teeAy, teeAz, out _);
+                        teeAx, D, Wf, Tf, Tw, teeIz, teeIy, teeIx, info.UptCy, teeAy, teeAz, out _);
                     break;
                 case 6: // PIPE
                     if (OD <= 0.0 || ID <= 0.0 || ID >= OD)
@@ -199,7 +234,7 @@ namespace StaadSteelApp.Core
                     double iAyf = PositiveOrFallback(info.UptAy, (5.0 / 6.0) * iAx, 1e-12);
                     double iAzf = PositiveOrFallback(info.UptAz, (5.0 / 6.0) * iAx, 1e-12);
                     createResult = OpenStaadPropertyAdapter.AddUPTPropertyISection(propertyObj, tableId, info.Name,
-                        D, Tw, D1, Wf, Tf, Wf1, Tf1, iAyf, iAzf, 0.0, out _);
+                        D, Tw, D1, Wf, Tf, Wf1, Tf1, iAyf, iAzf, info.UptXif, out _);
                     break;
                 case 10: // PRISMATIC
                     if (prismaticYD <= 0.0 || prismaticZD <= 0.0)

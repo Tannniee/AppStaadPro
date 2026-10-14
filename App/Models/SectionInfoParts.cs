@@ -12,6 +12,7 @@ namespace StaadSteelApp.Core
     public sealed class SectionGeometry
     {
         public eFramePropType PropType { get; set; }
+        public TaperedTubeShape TaperedTubeShape { get; set; }
         public double H1 { get; set; }
         public double H2 { get; set; }
         public double Tw { get; set; }
@@ -36,6 +37,10 @@ namespace StaadSteelApp.Core
         public double Py { get; set; }
         public double Hss { get; set; }
         public double Dee { get; set; }
+        public double R { get; set; }
+        public double Cz { get; set; }
+        public double Cy { get; set; }
+        public double Xif { get; set; }
     }
 
     public sealed class LegacySectionMetadata

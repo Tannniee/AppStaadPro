@@ -16,11 +16,16 @@ namespace StaadSteelApp.Core
         public static IReadOnlyList<GroupEntry> GetMemberGroups()
         {
             object openStaad = GetOpenStaadOrThrow();
+            return GetMemberGroups(openStaad);
+        }
+
+        internal static IReadOnlyList<GroupEntry> GetMemberGroups(object openStaad)
+        {
             if (!OpenStaadGeometryAdapter.TryGetGroupNames(openStaad, MemberGroupType, out string[] names, out string error))
                 throw new InvalidOperationException("Could not read member groups: " + error);
 
             var entries = new List<GroupEntry>();
-            foreach (string name in names.OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase))
+            foreach (string name in names.OrderBy(x => x, NaturalGroupNameComparer.Instance))
             {
                 int entityCount = GetGroupEntityCount(openStaad, name);
                 entries.Add(new GroupEntry
@@ -48,18 +53,48 @@ namespace StaadSteelApp.Core
 
         public static void HighlightMemberGroup(string groupName)
         {
+            HighlightMemberGroups(new[] { groupName });
+        }
+
+        public static void HighlightMemberGroups(IEnumerable<string> groupNames)
+        {
             object openStaad = GetOpenStaadOrThrow();
-            int[] entities = GetGroupEntities(openStaad, groupName);
+            HighlightMemberGroups(openStaad, groupNames);
+        }
+
+        internal static void HighlightMemberGroups(object openStaad, IEnumerable<string> groupNames)
+        {
+            string[] names = (groupNames ?? Enumerable.Empty<string>())
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(NormalizeGroupName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (names.Length == 0)
+                throw new InvalidOperationException("Please select at least one group.");
+
+            int[] entities = names
+                .SelectMany(name => GetGroupEntities(openStaad, name))
+                .Where(id => id > 0)
+                .Distinct()
+                .OrderBy(id => id)
+                .ToArray();
+
             if (entities.Length == 0)
-                throw new InvalidOperationException("The selected group does not contain any members.");
+                throw new InvalidOperationException("The selected group(s) do not contain any members.");
 
             HighlightMembers(openStaad, entities);
         }
 
         public static string CreateMemberGroupFromSelection(string groupName)
         {
-            string normalizedName = NormalizeNewGroupName(groupName);
             object openStaad = GetOpenStaadOrThrow();
+            return CreateMemberGroupFromSelection(openStaad, groupName);
+        }
+
+        internal static string CreateMemberGroupFromSelection(object openStaad, string groupName)
+        {
+            string normalizedName = NormalizeNewGroupName(groupName);
             int[] selectedMembers = GetSelectedMembers(openStaad);
 
             if (MemberGroupExists(openStaad, normalizedName))
@@ -77,8 +112,13 @@ namespace StaadSteelApp.Core
 
         public static void DeleteGroup(string groupName)
         {
-            string normalizedName = NormalizeGroupName(groupName);
             object openStaad = GetOpenStaadOrThrow();
+            DeleteGroup(openStaad, groupName);
+        }
+
+        internal static void DeleteGroup(object openStaad, string groupName)
+        {
+            string normalizedName = NormalizeGroupName(groupName);
 
             if (!OpenStaadGeometryAdapter.TryDeleteGroup(openStaad, normalizedName, out string error))
                 throw new InvalidOperationException(error);
@@ -86,23 +126,32 @@ namespace StaadSteelApp.Core
 
         public static void AddSelectedMembersToGroup(string groupName)
         {
-            UpdateMemberGroupFromSelection(groupName, UpdateAdd);
+            UpdateMemberGroupFromSelection(GetOpenStaadOrThrow(), groupName, UpdateAdd);
+        }
+
+        internal static void AddSelectedMembersToGroup(object openStaad, string groupName)
+        {
+            UpdateMemberGroupFromSelection(openStaad, groupName, UpdateAdd);
         }
 
         public static void RemoveSelectedMembersFromGroup(string groupName)
         {
-            UpdateMemberGroupFromSelection(groupName, UpdateRemove);
+            UpdateMemberGroupFromSelection(GetOpenStaadOrThrow(), groupName, UpdateRemove);
+        }
+
+        internal static void RemoveSelectedMembersFromGroup(object openStaad, string groupName)
+        {
+            UpdateMemberGroupFromSelection(openStaad, groupName, UpdateRemove);
         }
 
         public static void ReplaceGroupWithSelectedMembers(string groupName)
         {
-            UpdateMemberGroupFromSelection(groupName, UpdateReplace);
+            UpdateMemberGroupFromSelection(GetOpenStaadOrThrow(), groupName, UpdateReplace);
         }
 
-        private static void UpdateMemberGroupFromSelection(string groupName, int updateFlag)
+        private static void UpdateMemberGroupFromSelection(object openStaad, string groupName, int updateFlag)
         {
             string normalizedName = NormalizeGroupName(groupName);
-            object openStaad = GetOpenStaadOrThrow();
             int[] selectedMembers = GetSelectedMembers(openStaad);
 
             if (!OpenStaadGeometryAdapter.TryUpdateGroup(openStaad, normalizedName, updateFlag, selectedMembers, out string error))
@@ -198,6 +247,94 @@ namespace StaadSteelApp.Core
                 throw new InvalidOperationException("Please enter a valid group name.");
 
             return "_" + safeName;
+        }
+
+        private sealed class NaturalGroupNameComparer : IComparer<string>
+        {
+            internal static readonly NaturalGroupNameComparer Instance = new NaturalGroupNameComparer();
+
+            public int Compare(string left, string right)
+            {
+                if (ReferenceEquals(left, right))
+                    return 0;
+
+                if (left == null)
+                    return -1;
+
+                if (right == null)
+                    return 1;
+
+                string leftText = TrimGroupPrefix(left);
+                string rightText = TrimGroupPrefix(right);
+                int leftIndex = 0;
+                int rightIndex = 0;
+
+                while (leftIndex < leftText.Length && rightIndex < rightText.Length)
+                {
+                    char leftChar = leftText[leftIndex];
+                    char rightChar = rightText[rightIndex];
+
+                    if (char.IsDigit(leftChar) && char.IsDigit(rightChar))
+                    {
+                        int numberCompare = CompareNumberSegment(leftText, ref leftIndex, rightText, ref rightIndex);
+                        if (numberCompare != 0)
+                            return numberCompare;
+
+                        continue;
+                    }
+
+                    int charCompare = char.ToUpperInvariant(leftChar).CompareTo(char.ToUpperInvariant(rightChar));
+                    if (charCompare != 0)
+                        return charCompare;
+
+                    leftIndex++;
+                    rightIndex++;
+                }
+
+                int lengthCompare = (leftText.Length - leftIndex).CompareTo(rightText.Length - rightIndex);
+                if (lengthCompare != 0)
+                    return lengthCompare;
+
+                return StringComparer.CurrentCultureIgnoreCase.Compare(left, right);
+            }
+
+            private static string TrimGroupPrefix(string value)
+            {
+                string text = (value ?? string.Empty).Trim();
+                return text.StartsWith("_", StringComparison.Ordinal) ? text.Substring(1) : text;
+            }
+
+            private static int CompareNumberSegment(string left, ref int leftIndex, string right, ref int rightIndex)
+            {
+                int leftStart = leftIndex;
+                int rightStart = rightIndex;
+
+                while (leftIndex < left.Length && char.IsDigit(left[leftIndex]))
+                    leftIndex++;
+
+                while (rightIndex < right.Length && char.IsDigit(right[rightIndex]))
+                    rightIndex++;
+
+                string leftNumber = left.Substring(leftStart, leftIndex - leftStart).TrimStart('0');
+                string rightNumber = right.Substring(rightStart, rightIndex - rightStart).TrimStart('0');
+
+                if (leftNumber.Length == 0)
+                    leftNumber = "0";
+
+                if (rightNumber.Length == 0)
+                    rightNumber = "0";
+
+                int lengthCompare = leftNumber.Length.CompareTo(rightNumber.Length);
+                if (lengthCompare != 0)
+                    return lengthCompare;
+
+                int valueCompare = string.CompareOrdinal(leftNumber, rightNumber);
+                if (valueCompare != 0)
+                    return valueCompare;
+
+                int rawLengthCompare = (leftIndex - leftStart).CompareTo(rightIndex - rightStart);
+                return rawLengthCompare;
+            }
         }
     }
 }

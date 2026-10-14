@@ -14,14 +14,22 @@ namespace StaadSteelApp
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            StaadManager.Initialize();
 
-            using (var resetEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ResetPositionEventName))
+            try
             {
-                var mainForm = new MainForm();
-                using (var listener = new ResetPositionListener(resetEvent, mainForm))
+                using (var resetEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ResetPositionEventName))
                 {
-                    Application.Run(mainForm);
+                    var mainForm = new MainForm();
+                    using (var listener = new ResetPositionListener(resetEvent, mainForm))
+                    {
+                        Application.Run(mainForm);
+                    }
                 }
+            }
+            finally
+            {
+                StaadManager.Shutdown();
             }
         }
     }

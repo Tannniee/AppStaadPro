@@ -9,24 +9,29 @@ namespace StaadSteelApp.Core.Interop
             return InvokeInt(propertyObj, "AddUPTPropertyWIDEFLANGE", out error, tableId, name, ax, d, tw, wf, tf, iz, iy, ix, ay, az);
         }
 
-        internal static int AddUPTPropertyChannel(object propertyObj, int tableId, string name, double ax, double d, double tw, double wf, double tf, double iz, double iy, double ix, double beta, double ay, double az, out string error)
+        internal static int AddUPTPropertyWideFlangeUnequal(object propertyObj, int tableId, string name, double[] properties, out string error)
         {
-            return InvokeInt(propertyObj, "AddUPTPropertyCHANNEL", out error, tableId, name, ax, d, tw, wf, tf, iz, iy, ix, beta, ay, az);
+            return InvokeInt(propertyObj, "AddUPTPropertyWIDEFLANGEUNEQUAL", out error, tableId, name, properties);
         }
 
-        internal static int AddUPTPropertyAngle(object propertyObj, int tableId, string name, double d, double wf, double tf, double beta, double ay, double az, out string error)
+        internal static int AddUPTPropertyChannel(object propertyObj, int tableId, string name, double ax, double d, double tw, double wf, double tf, double iz, double iy, double ix, double cz, double ay, double az, out string error)
         {
-            return InvokeInt(propertyObj, "AddUPTPropertyANGLE", out error, tableId, name, d, wf, tf, beta, ay, az);
+            return InvokeInt(propertyObj, "AddUPTPropertyCHANNEL", out error, tableId, name, ax, d, tw, wf, tf, iz, iy, ix, cz, ay, az);
         }
 
-        internal static int AddUPTPropertyDoubleAngle(object propertyObj, int tableId, string name, double d, double wf, double tf, double spacing, double iz, double iy, double ix, double beta, double ay, double az, out string error)
+        internal static int AddUPTPropertyAngle(object propertyObj, int tableId, string name, double d, double wf, double tf, double r, double ay, double az, out string error)
         {
-            return InvokeInt(propertyObj, "AddUPTPropertyDOUBLEANGLE", out error, tableId, name, d, wf, tf, spacing, iz, iy, ix, beta, ay, az);
+            return InvokeInt(propertyObj, "AddUPTPropertyANGLE", out error, tableId, name, d, wf, tf, r, ay, az);
         }
 
-        internal static int AddUPTPropertyTee(object propertyObj, int tableId, string name, double ax, double d, double wf, double tf, double tw, double iz, double iy, double ix, double beta, double ay, double az, out string error)
+        internal static int AddUPTPropertyDoubleAngle(object propertyObj, int tableId, string name, double d, double wf, double tf, double spacing, double iz, double iy, double ix, double cy, double ay, double az, out string error)
         {
-            return InvokeInt(propertyObj, "AddUPTPropertyTEE", out error, tableId, name, ax, d, wf, tf, tw, iz, iy, ix, beta, ay, az);
+            return InvokeInt(propertyObj, "AddUPTPropertyDOUBLEANGLE", out error, tableId, name, d, wf, tf, spacing, iz, iy, ix, cy, ay, az);
+        }
+
+        internal static int AddUPTPropertyTee(object propertyObj, int tableId, string name, double ax, double d, double wf, double tf, double tw, double iz, double iy, double ix, double cy, double ay, double az, out string error)
+        {
+            return InvokeInt(propertyObj, "AddUPTPropertyTEE", out error, tableId, name, ax, d, wf, tf, tw, iz, iy, ix, cy, ay, az);
         }
 
         internal static int AddUPTPropertyPipe(object propertyObj, int tableId, string name, double od, double id, double ay, double az, out string error)

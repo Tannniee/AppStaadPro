@@ -84,7 +84,15 @@ namespace StaadSteelApp.Core
 
         public static IReadOnlyList<LoadCaseItem> GetPrimaryLoadCases()
         {
-            if (!TryGetLoadObject(out object loadObj, out _))
+            if (!TryGetOpenStaad(out object openStaad, out _))
+                return Array.Empty<LoadCaseItem>();
+
+            return GetPrimaryLoadCases(openStaad);
+        }
+
+        internal static IReadOnlyList<LoadCaseItem> GetPrimaryLoadCases(object openStaad)
+        {
+            if (!TryGetLoadObject(openStaad, out object loadObj, out _))
                 return Array.Empty<LoadCaseItem>();
 
             if (!OpenStaadLoadAdapter.TryGetPrimaryLoadCaseNumbers(loadObj, out int[] numbers, out _) ||
@@ -110,6 +118,12 @@ namespace StaadSteelApp.Core
         {
             if (!TryGetOpenStaad(out object openStaad, out _))
                 return Array.Empty<string>();
+
+            return GetGroupNames(openStaad, groupType);
+        }
+
+        internal static IReadOnlyList<string> GetGroupNames(object openStaad, GroupType groupType)
+        {
 
             if (!OpenStaadGeometryAdapter.TryGetGroupNames(openStaad, (int)groupType, out string[] names, out _) ||
                 names.Length == 0)
@@ -139,6 +153,12 @@ namespace StaadSteelApp.Core
             if (!TryGetOpenStaad(out object openStaad, out string connectionError))
                 throw new InvalidOperationException(connectionError);
 
+            AssignUniformMemberLoad(openStaad, loadCaseNo, direction, force);
+        }
+
+        internal static void AssignUniformMemberLoad(object openStaad, int loadCaseNo, MemberLoadDirection direction, double force)
+        {
+
             if (!OpenStaadSelectionAdapter.TryGetSelectedBeamIds(
                     openStaad,
                     false,
@@ -157,22 +177,42 @@ namespace StaadSteelApp.Core
                     : "Could not read selected member(s): " + error);
             }
 
-            AssignUniformMemberLoad(loadCaseNo, beams, direction, force, "OpenSTAAD rejected the member load command.");
+            AssignUniformMemberLoad(openStaad, loadCaseNo, beams, direction, force, "OpenSTAAD rejected the member load command.");
         }
 
         public static void AssignUniformMemberLoadToGroup(int loadCaseNo, string groupName, MemberLoadDirection direction, double force)
         {
-            int[] members = GetGroupEntitiesOrThrow(groupName);
+            if (!TryGetOpenStaad(out object openStaad, out string connectionError))
+                throw new InvalidOperationException(connectionError);
+
+            AssignUniformMemberLoadToGroup(openStaad, loadCaseNo, groupName, direction, force);
+        }
+
+        internal static void AssignUniformMemberLoadToGroup(
+            object openStaad,
+            int loadCaseNo,
+            string groupName,
+            MemberLoadDirection direction,
+            double force)
+        {
+
+            int[] members = GetGroupEntitiesOrThrow(openStaad, groupName);
             if (members.Length == 0)
                 throw new InvalidOperationException("The selected member group does not contain any members.");
 
-            AssignUniformMemberLoad(loadCaseNo, members, direction, force, "OpenSTAAD rejected the member group load command.");
+            AssignUniformMemberLoad(openStaad, loadCaseNo, members, direction, force, "OpenSTAAD rejected the member group load command.");
         }
 
         public static void AssignNodalLoad(int loadCaseNo, double fx, double fy, double fz, double mx, double my, double mz)
         {
             if (!TryGetOpenStaad(out object openStaad, out string connectionError))
                 throw new InvalidOperationException(connectionError);
+
+            AssignNodalLoad(openStaad, loadCaseNo, fx, fy, fz, mx, my, mz);
+        }
+
+        internal static void AssignNodalLoad(object openStaad, int loadCaseNo, double fx, double fy, double fz, double mx, double my, double mz)
+        {
 
             int ignoredInvalidCount;
             if (!OpenStaadSelectionAdapter.TryGetSelectedNodeIds(
@@ -194,24 +234,50 @@ namespace StaadSteelApp.Core
                     : "Could not read selected node(s): " + error);
             }
 
-            AssignNodalLoad(loadCaseNo, nodes, fx, fy, fz, mx, my, mz, "OpenSTAAD rejected the nodal load command.");
+            AssignNodalLoad(openStaad, loadCaseNo, nodes, fx, fy, fz, mx, my, mz, "OpenSTAAD rejected the nodal load command.");
         }
 
         public static void AssignNodalLoadToGroup(int loadCaseNo, string groupName, double fx, double fy, double fz, double mx, double my, double mz)
         {
-            int[] nodes = GetGroupEntitiesOrThrow(groupName);
+            if (!TryGetOpenStaad(out object openStaad, out string connectionError))
+                throw new InvalidOperationException(connectionError);
+
+            AssignNodalLoadToGroup(openStaad, loadCaseNo, groupName, fx, fy, fz, mx, my, mz);
+        }
+
+        internal static void AssignNodalLoadToGroup(
+            object openStaad,
+            int loadCaseNo,
+            string groupName,
+            double fx,
+            double fy,
+            double fz,
+            double mx,
+            double my,
+            double mz)
+        {
+
+            int[] nodes = GetGroupEntitiesOrThrow(openStaad, groupName);
             if (nodes.Length == 0)
                 throw new InvalidOperationException("The selected node group does not contain any nodes.");
 
-            AssignNodalLoad(loadCaseNo, nodes, fx, fy, fz, mx, my, mz, "OpenSTAAD rejected the nodal group load command.");
+            AssignNodalLoad(openStaad, loadCaseNo, nodes, fx, fy, fz, mx, my, mz, "OpenSTAAD rejected the nodal group load command.");
         }
 
         public static void HighlightLoadAssignments(LoadTreeItem item)
         {
+            if (!TryGetOpenStaad(out object openStaad, out string connectionError))
+                throw new InvalidOperationException(connectionError);
+
+            HighlightLoadAssignments(openStaad, item);
+        }
+
+        internal static void HighlightLoadAssignments(object openStaad, LoadTreeItem item)
+        {
             if (item == null)
                 return;
 
-            if (!TryGetGeometry(out object geometry, out string geometryError))
+            if (!OpenStaadAdapterHelpers.TryGetSubObject(openStaad, "Geometry", out object geometry, out string geometryError))
                 throw new InvalidOperationException(geometryError);
 
             int[] ids = CopyIds(item.Assignments);
@@ -219,7 +285,7 @@ namespace StaadSteelApp.Core
                 throw new InvalidOperationException("This load item does not contain any assigned entities.");
 
             bool isNodeLoad = item.TypeCode == 3110 || item.TypeCode == 3120;
-            string highlightKey = BuildHighlightKey(isNodeLoad, ids);
+            string highlightKey = StaadManager.GetModelCacheKey(openStaad) + "|" + BuildHighlightKey(isNodeLoad, ids);
 
             if (string.Equals(_lastHighlightKey, highlightKey, StringComparison.Ordinal))
                 return;
@@ -248,9 +314,15 @@ namespace StaadSteelApp.Core
             _lastHighlightKey = highlightKey;
         }
 
-        private static void AssignUniformMemberLoad(int loadCaseNo, int[] beams, MemberLoadDirection direction, double force, string failureMessage)
+        private static void AssignUniformMemberLoad(
+            object openStaad,
+            int loadCaseNo,
+            int[] beams,
+            MemberLoadDirection direction,
+            double force,
+            string failureMessage)
         {
-            if (!TryGetLoadObject(out object loadObj, out string loadError))
+            if (!TryGetLoadObject(openStaad, out object loadObj, out string loadError))
                 throw new InvalidOperationException(loadError);
 
             if (!TrySetLoadActive(loadObj, loadCaseNo, out string activeError))
@@ -260,9 +332,19 @@ namespace StaadSteelApp.Core
                 throw new InvalidOperationException(failureMessage);
         }
 
-        private static void AssignNodalLoad(int loadCaseNo, int[] nodes, double fx, double fy, double fz, double mx, double my, double mz, string failureMessage)
+        private static void AssignNodalLoad(
+            object openStaad,
+            int loadCaseNo,
+            int[] nodes,
+            double fx,
+            double fy,
+            double fz,
+            double mx,
+            double my,
+            double mz,
+            string failureMessage)
         {
-            if (!TryGetLoadObject(out object loadObj, out string loadError))
+            if (!TryGetLoadObject(openStaad, out object loadObj, out string loadError))
                 throw new InvalidOperationException(loadError);
 
             if (!TrySetLoadActive(loadObj, loadCaseNo, out string activeError))
@@ -293,23 +375,22 @@ namespace StaadSteelApp.Core
             return OpenStaadLoadAdapter.TryGetLoadObject(openStaad, out loadObj, out error);
         }
 
-        private static bool TryGetGeometry(out object geometry, out string error)
+        private static bool TryGetLoadObject(object openStaad, out object loadObj, out string error)
         {
-            geometry = null;
-
-            if (!TryGetOpenStaad(out object openStaad, out error))
+            loadObj = null;
+            if (openStaad == null)
+            {
+                error = "OpenSTAAD connection is not available.";
                 return false;
+            }
 
-            return OpenStaadAdapterHelpers.TryGetSubObject(openStaad, "Geometry", out geometry, out error);
+            return OpenStaadLoadAdapter.TryGetLoadObject(openStaad, out loadObj, out error);
         }
 
-        private static int[] GetGroupEntitiesOrThrow(string groupName)
+        private static int[] GetGroupEntitiesOrThrow(object openStaad, string groupName)
         {
             if (string.IsNullOrWhiteSpace(groupName))
                 throw new InvalidOperationException("Please select a group.");
-
-            if (!TryGetOpenStaad(out object openStaad, out string connectionError))
-                throw new InvalidOperationException(connectionError);
 
             if (!OpenStaadGeometryAdapter.TryGetGroupEntities(openStaad, groupName, out int[] entities, out string error))
             {

@@ -12,7 +12,7 @@ namespace StaadSteelApp
     {
         // Suppresses name recalculation while controls are populated programmatically.
         private bool _isPopulating = false;
-        private bool _materialListLoaded = false;
+        private string _materialListModelKey = string.Empty;
         private TypeSpecForm _sidePanel;
         private StatusForm _statusPanel;
         private MiscToolsForm _miscPanel;
@@ -38,6 +38,7 @@ namespace StaadSteelApp
                 LoadLegacyZones();
 
                 InitializeStatusPanel();
+                InitializeStaadConnectionStatus();
 
                 InitializeUsedSectionsHighlightTimer();
 
@@ -125,6 +126,7 @@ namespace StaadSteelApp
             _assignLoadForm?.Close();
             _groupsForm?.Close();
             DisposeUsedSectionsHighlightTimer();
+            DisposeStaadConnectionStatus();
             CloseStatusPanel();
             base.OnFormClosing(e);
         }
@@ -196,10 +198,11 @@ namespace StaadSteelApp
                     "Circle",
                     "Rectangle",
                     "Tee",
-                    "Trapezoidal",
-                    "General",
-                    "Tapered Tube",
-                    "Legacy"
+                     "Trapezoidal",
+                     "General",
+                     "Tapered Pipe",
+                     "Tapered Tube",
+                     "Legacy"
                 });
             }
 
@@ -228,19 +231,6 @@ namespace StaadSteelApp
             UpdateVisibility();
             UpdateName();
 
-            if (chkUPT.Checked)
-            {
-                try
-                {
-                    TryGetMainOpenStaad(out object openStaad);
-                    string preferredMaterial = string.IsNullOrWhiteSpace(cboMaterial.Text) ? "None" : cboMaterial.Text;
-                    EnsureMaterialListLoaded(openStaad, preferredMaterial);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine("Load material list for UPT failed: " + ex.Message);
-                }
-            }
         }
     }
 }

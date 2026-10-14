@@ -43,13 +43,17 @@ namespace StaadSteelApp.Core.Misc
 
         internal static ServiceOperationResult ApplyReleasesSelected(int[] startDofInput, int[] endDofInput)
         {
-            if (!MiscOpenStaadService.TryGetProperty(out object propObj, out string propertyError))
+            if (!MiscOpenStaadService.TryGetConnection(out StaadConnectionSnapshot connection, out string connectionError))
+                return ServiceOperationResult.Error("Member Releases", connectionError);
+
+            object openStaad = connection.OpenStaad;
+            if (!MiscOpenStaadService.TryGetProperty(openStaad, out object propObj, out string propertyError))
             {
                 Debug.WriteLine(propertyError);
                 return ServiceOperationResult.Error("Member Releases", propertyError);
             }
 
-            if (!MiscSelectionService.TryGetSelectedBeamIds(out int[] beamIds, out string selectionError))
+            if (!MiscSelectionService.TryGetSelectedBeamIds(openStaad, out int[] beamIds, out string selectionError))
             {
                 string message = string.IsNullOrWhiteSpace(selectionError)
                     ? "Could not read STAAD selection."
@@ -92,13 +96,17 @@ namespace StaadSteelApp.Core.Misc
 
         internal static ServiceOperationResult ResetDefaultSelected()
         {
-            if (!MiscOpenStaadService.TryGetProperty(out object propObj, out string propertyError))
+            if (!MiscOpenStaadService.TryGetConnection(out StaadConnectionSnapshot connection, out string connectionError))
+                return ServiceOperationResult.Error("Reset Members", connectionError);
+
+            object openStaad = connection.OpenStaad;
+            if (!MiscOpenStaadService.TryGetProperty(openStaad, out object propObj, out string propertyError))
             {
                 Debug.WriteLine(propertyError);
                 return ServiceOperationResult.Error("Reset Members", propertyError);
             }
 
-            if (!MiscSelectionService.TryGetSelectedBeamIds(out int[] beamIds, out string _selectionError))
+            if (!MiscSelectionService.TryGetSelectedBeamIds(openStaad, out int[] beamIds, out string _selectionError))
                 return ServiceOperationResult.Info("Reset Members", "Could not read STAAD selection.");
 
             if (beamIds.Length == 0)

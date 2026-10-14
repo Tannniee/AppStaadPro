@@ -12,19 +12,6 @@ namespace StaadSteelApp.Core.Misc
 
         internal static ServiceOperationResult ApplyBetaAngleSelected(Worksheet ws)
         {
-            if (!MiscOpenStaadService.TryGetProperty(out object propObj, out string propertyError))
-            {
-                Debug.WriteLine(propertyError);
-                return ServiceOperationResult.Error("Beta Angle", propertyError);
-            }
-
-            if (!MiscSelectionService.TryGetSelectedBeamIds(out int[] beamIds, out _))
-                return ServiceOperationResult.Info("Beta Angle", "Could not read STAAD selection.");
-
-            int beamCount = beamIds.Length;
-            if (beamCount == 0)
-                return ServiceOperationResult.Info("Beta Angle", "Please select beams in STAAD.");
-
             double angle;
             object raw = null;
             try
@@ -48,13 +35,17 @@ namespace StaadSteelApp.Core.Misc
 
         internal static ServiceOperationResult ApplyBetaAngleSelected(double angle)
         {
-            if (!MiscOpenStaadService.TryGetProperty(out object propObj, out string propertyError))
+            if (!MiscOpenStaadService.TryGetConnection(out StaadConnectionSnapshot connection, out string connectionError))
+                return ServiceOperationResult.Error("Beta Angle", connectionError);
+
+            object openStaad = connection.OpenStaad;
+            if (!MiscOpenStaadService.TryGetProperty(openStaad, out object propObj, out string propertyError))
             {
                 Debug.WriteLine(propertyError);
                 return ServiceOperationResult.Error("Beta Angle", propertyError);
             }
 
-            if (!MiscSelectionService.TryGetSelectedBeamIds(out int[] beamIds, out string selectionError))
+            if (!MiscSelectionService.TryGetSelectedBeamIds(openStaad, out int[] beamIds, out string selectionError))
             {
                 string message = string.IsNullOrWhiteSpace(selectionError)
                     ? "Could not read STAAD selection."

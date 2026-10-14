@@ -90,6 +90,21 @@ namespace StaadSteelApp.Core
                 out message);
         }
 
+        public static bool TryCreateNodesByBeamVector(
+            int[] referenceNodeIds,
+            int directionBeamId,
+            double distance,
+            out int createdCount,
+            out string message)
+        {
+            return AdvanceVectorNodeService.TryCreateNodesByBeamVector(
+                referenceNodeIds,
+                directionBeamId,
+                distance,
+                out createdCount,
+                out message);
+        }
+
         public static bool TryAlignNodesToBeamPlanes(
             int[] targetNodeIds,
             int directionBeamId,
@@ -232,6 +247,48 @@ namespace StaadSteelApp.Core
                 alignZ,
                 targetZ,
                 out updatedCount,
+                out message);
+        }
+
+        public static bool TryCopyNodesToTemplate(
+            int[] sourceNodeIds,
+            int templateNodeId,
+            bool alignX,
+            bool alignY,
+            bool alignZ,
+            out int createdCount,
+            out string message)
+        {
+            return AdvanceAlignService.TryCopyNodesToTemplate(
+                sourceNodeIds,
+                templateNodeId,
+                alignX,
+                alignY,
+                alignZ,
+                out createdCount,
+                out message);
+        }
+
+        public static bool TryCopyNodesToCoordinates(
+            int[] sourceNodeIds,
+            bool alignX,
+            double targetX,
+            bool alignY,
+            double targetY,
+            bool alignZ,
+            double targetZ,
+            out int createdCount,
+            out string message)
+        {
+            return AdvanceAlignService.TryCopyNodesToCoordinates(
+                sourceNodeIds,
+                alignX,
+                targetX,
+                alignY,
+                targetY,
+                alignZ,
+                targetZ,
+                out createdCount,
                 out message);
         }
 

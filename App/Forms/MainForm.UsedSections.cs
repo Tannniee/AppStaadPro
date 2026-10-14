@@ -8,6 +8,9 @@ namespace StaadSteelApp
     public partial class MainForm
     {
         private bool _isRefreshingUsedSections;
+        private string _usedSectionsBoundModelKey = string.Empty;
+        private StaadConnectionSnapshot _usedSectionsBoundConnection;
+        private string _pendingUsedSectionModelKey = string.Empty;
 
         private void InitializeUsedSectionsHighlightTimer()
         {
@@ -69,6 +72,7 @@ namespace StaadSteelApp
                 return;
 
             _usedSectionsForm = new UsedSectionsForm();
+            _usedSectionsForm.SetWaitingState("Activate a STAAD model...");
             _usedSectionsForm.RestoreLocation(GetDefaultUsedSectionsLocation());
             _usedSectionsForm.SectionActivated += UsedSectionsForm_SectionActivated;
             _usedSectionsForm.FormClosing += UsedSectionsForm_FormClosing;
@@ -84,9 +88,13 @@ namespace StaadSteelApp
             if (_isRefreshingUsedSections || _usedSectionsForm == null || _usedSectionsForm.IsDisposed)
                 return;
 
+            string expectedModelKey = _usedSectionsBoundModelKey;
+            if (!TryGetUsedSectionsBoundOpenStaad(expectedModelKey, out object openStaad, showWarning: true))
+                return;
+
             if (_usedSectionsForm.SelectedEntryCount == 1)
             {
-                PopulateUiFromUsedSection(_usedSectionsForm.SelectedEntry);
+                PopulateUiFromUsedSection(openStaad, _usedSectionsForm.SelectedEntry);
             }
 
             int[] propertyIds = _usedSectionsForm.SelectedPropertyIds;
@@ -97,6 +105,7 @@ namespace StaadSteelApp
 
             _pendingUsedSectionPropertyIds = propertyIds;
             _pendingUsedSectionBeamIds = beamIds;
+            _pendingUsedSectionModelKey = expectedModelKey;
             _usedSectionsHighlightTimer?.Stop();
             _usedSectionsHighlightTimer?.Start();
         }
@@ -107,8 +116,10 @@ namespace StaadSteelApp
 
             int[] beamIds = _pendingUsedSectionBeamIds;
             int[] propertyIds = _pendingUsedSectionPropertyIds;
+            string expectedModelKey = _pendingUsedSectionModelKey;
             _pendingUsedSectionBeamIds = null;
             _pendingUsedSectionPropertyIds = null;
+            _pendingUsedSectionModelKey = string.Empty;
             if ((beamIds == null || beamIds.Length == 0) &&
                 (propertyIds == null || propertyIds.Length == 0))
                 return;
@@ -116,7 +127,8 @@ namespace StaadSteelApp
             if (_isRefreshingUsedSections || _usedSectionsForm == null || _usedSectionsForm.IsDisposed)
                 return;
 
-            if (!TryGetMainOpenStaad(out object openStaad)) return;
+            if (!TryGetUsedSectionsBoundOpenStaad(expectedModelKey, out object openStaad, showWarning: false))
+                return;
 
             if (beamIds != null && beamIds.Length > 0)
             {
@@ -140,12 +152,10 @@ namespace StaadSteelApp
             }
         }
 
-        private void PopulateUiFromUsedSection(UsedSectionEntry entry)
+        private void PopulateUiFromUsedSection(object openStaad, UsedSectionEntry entry)
         {
             if (entry == null || entry.PropertyId <= 0)
                 return;
-
-            if (!TryGetMainOpenStaad(out object openStaad)) return;
 
             try
             {
@@ -207,24 +217,84 @@ namespace StaadSteelApp
             if (_usedSectionsForm == null || _usedSectionsForm.IsDisposed)
                 return;
 
-            if (!TryGetMainOpenStaad(out object openStaad)) return;
+            if (!StaadManager.TryGetConnection(out StaadConnectionSnapshot connection, out string connectionError))
+            {
+                _usedSectionsBoundConnection = null;
+                _usedSectionsBoundModelKey = string.Empty;
+                _usedSectionsForm.SetEntries(Array.Empty<UsedSectionEntry>());
+                _usedSectionsForm.SetWaitingState("Activate a STAAD model...");
+                return;
+            }
+
+            object openStaad = connection.OpenStaad;
 
             int[] selectedPropertyIds = _usedSectionsForm.SelectedPropertyIds;
 
             _isRefreshingUsedSections = true;
             try
             {
+                _usedSectionsForm.SetLoadingState(connection.Identity);
                 var items = SectionService.GetUsedSections(openStaad);
                 _usedSectionsForm.SetEntries(items, selectedPropertyIds, selectedPropertyId);
+                _usedSectionsBoundConnection = connection;
+                _usedSectionsBoundModelKey = connection.Identity.CacheKey;
+                _usedSectionsForm.SetConnectedState(connection.Identity, items.Count);
             }
             catch (Exception ex)
             {
+                _usedSectionsBoundConnection = null;
+                _usedSectionsBoundModelKey = string.Empty;
+                _usedSectionsForm.SetEntries(Array.Empty<UsedSectionEntry>());
+                _usedSectionsForm.SetWaitingState("Could not load used sections.");
                 TopMostMessageBox.ShowWarning("Could not refresh used sections list: " + ex.Message, "Used Sections");
             }
             finally
             {
                 _isRefreshingUsedSections = false;
             }
+        }
+
+        private bool TryGetUsedSectionsBoundOpenStaad(
+            string expectedModelKey,
+            out object openStaad,
+            bool showWarning)
+        {
+            openStaad = null;
+            StaadConnectionSnapshot connection = _usedSectionsBoundConnection;
+            if (connection == null)
+            {
+                if (showWarning)
+                    TopMostMessageBox.ShowWarning(
+                        "Used Sections is waiting for an active STAAD model.",
+                        "Used Sections");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(expectedModelKey) ||
+                !string.Equals(expectedModelKey, connection.Identity.CacheKey, StringComparison.OrdinalIgnoreCase))
+            {
+                if (showWarning)
+                {
+                    TopMostMessageBox.ShowWarning(
+                        "The active STAAD model changed. Used Sections was refreshed; please select the section again.",
+                        "Used Sections");
+                }
+                return false;
+            }
+
+            if (!StaadManager.TryValidateConnectionSnapshot(connection, out string validationError))
+            {
+                _usedSectionsBoundConnection = null;
+                _usedSectionsBoundModelKey = string.Empty;
+                _usedSectionsForm?.SetEntries(Array.Empty<UsedSectionEntry>());
+                _usedSectionsForm?.SetWaitingState("Activate a STAAD model...");
+                if (showWarning)
+                    TopMostMessageBox.ShowWarning(validationError, "Used Sections");
+                return false;
+            }
+
+            openStaad = connection.OpenStaad;
+            return true;
         }
     }
 }

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace StaadSteelApp.Core.Interop
 {
@@ -77,104 +76,6 @@ namespace StaadSteelApp.Core.Interop
             };
 
             return true;
-        }
-
-        internal static bool TryGetDesignObject(object openStaad, out object designObj, out string error)
-        {
-            return OpenStaadAdapterHelpers.TryGetSubObject(openStaad, "Design", out designObj, out error);
-        }
-
-        internal static bool TryGetDesignBriefCode(object designObj, int briefRef, out int code, out string error)
-        {
-            code = 0;
-            error = string.Empty;
-
-            if (!ComInvoke.TryInvoke(designObj, "GetDesignBriefCode", out object codeObj, out error, new object[] { briefRef }))
-                return false;
-
-            code = ComResult.ToInt32(codeObj);
-            return true;
-        }
-
-        internal static bool TryGetMemberDesignParameters(
-            object designObj,
-            int briefRef,
-            int memberNo,
-            out Dictionary<string, string> parameters,
-            out string error)
-        {
-            parameters = null;
-            error = string.Empty;
-
-            Type paramType = Type.GetTypeFromProgID("StaadPro.MembSteelDgnParams");
-            if (paramType == null)
-            {
-                error = "Could not create COM type from ProgID 'StaadPro.MembSteelDgnParams'.";
-                return false;
-            }
-
-            object paramObject;
-            try
-            {
-                paramObject = Activator.CreateInstance(paramType);
-            }
-            catch (Exception ex)
-            {
-                error = ex.Message;
-                return false;
-            }
-
-            if (paramObject == null)
-            {
-                error = "STAAD member design parameter object could not be created.";
-                return false;
-            }
-
-            object[] args = new object[] { briefRef, memberNo, paramObject };
-            if (!ComInvoke.TryInvoke(designObj, "GetMemberDesignParameters", out object retRaw, out error, args))
-                return false;
-
-            int ret = ComResult.ToInt32(retRaw);
-            if (ret != 0)
-            {
-                error = "GetMemberDesignParameters returned " + ret + ".";
-                return false;
-            }
-
-            if (!ComInvoke.TryGetProperty(paramObject, "Count", out object countRaw, out error))
-                return false;
-
-            int count = ComResult.ToInt32(countRaw);
-            if (count <= 0)
-            {
-                error = "No design parameters returned.";
-                return false;
-            }
-
-            var parsed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < count; i++)
-            {
-                if (!ComInvoke.TryGetProperty(paramObject, "Name", out object nameRaw, out string nameError, new object[] { i }))
-                {
-                    error = nameError;
-                    continue;
-                }
-
-                string name = Convert.ToString(nameRaw);
-                if (string.IsNullOrWhiteSpace(name))
-                    continue;
-
-                if (!ComInvoke.TryGetProperty(paramObject, "Value", out object valueRaw, out string valueError, new object[] { i }))
-                {
-                    error = valueError;
-                    valueRaw = string.Empty;
-                }
-
-                parsed[name.Trim().ToUpperInvariant()] = (Convert.ToString(valueRaw) ?? string.Empty).Trim();
-            }
-
-            parameters = parsed;
-            return parsed.Count > 0;
         }
 
         private static double ToDouble(object value)

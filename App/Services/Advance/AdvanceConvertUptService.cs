@@ -10,6 +10,9 @@ namespace StaadSteelApp.Core.Advance
     internal static partial class AdvanceConvertUptService
     {
         private const double DimensionToleranceMm = 0.001;
+        private const int TaperedTubeTypeCode = 675;
+        private const int TaperedTubeRoundReadType = 1;
+        private const int TaperedTubeSquareReadType = 6;
 
         internal static bool TryPreviewLegacyPipeTubeConversion(out AdvanceUptConversionPreview preview, out string message)
         {
@@ -67,9 +70,24 @@ namespace StaadSteelApp.Core.Advance
                     continue;
                 }
 
-                if (!TryBuildCandidate(typeCode, props, out ConversionCandidate candidate, out string dimensionError))
+                if (!TryBuildCandidate(
+                        typeCode,
+                        props,
+                        out ConversionCandidate candidate,
+                        out CandidateBuildFailure failure,
+                        out string dimensionError))
                 {
-                    if (IsLegacyPipeOrTube(typeCode))
+                    if (failure == CandidateBuildFailure.NonUniformTapered)
+                    {
+                        preview.NonUniformTaperedMemberCount += memberCount;
+                        warnings.AppendLine($"Ref {propertyRefNo}: {dimensionError}");
+                    }
+                    else if (failure == CandidateBuildFailure.UnsupportedTaperedSubtype)
+                    {
+                        preview.UnsupportedTaperedSubtypeMemberCount += memberCount;
+                        warnings.AppendLine($"Ref {propertyRefNo}: {dimensionError}");
+                    }
+                    else if (IsConvertiblePipeOrTube(typeCode))
                     {
                         preview.InvalidDimensionMemberCount += memberCount;
                         warnings.AppendLine($"Ref {propertyRefNo}: {dimensionError}");
@@ -82,14 +100,32 @@ namespace StaadSteelApp.Core.Advance
                     continue;
                 }
 
-                if (!buckets.TryGetValue(candidate.Key, out PreviewBucket bucket))
+                if (!AdvanceMemberAssignmentService.TryCapture(
+                        propertyObj,
+                        members,
+                        out AdvanceMemberAssignmentSnapshot assignmentSnapshot,
+                        out string materialError))
                 {
-                    bucket = new PreviewBucket(candidate);
-                    buckets.Add(candidate.Key, bucket);
+                    preview.UnsafeMaterialMemberCount += memberCount;
+                    warnings.AppendLine($"Ref {propertyRefNo}: Material could not be read safely. {materialError}");
+                    continue;
                 }
 
-                bucket.PropertyRefIds.Add(propertyRefNo);
-                bucket.MemberIds.AddRange(members);
+                foreach (KeyValuePair<string, int[]> materialGroup in assignmentSnapshot.GetMaterialGroups())
+                {
+                    string bucketKey = candidate.Key + "|MAT|" + materialGroup.Key;
+                    if (!buckets.TryGetValue(bucketKey, out PreviewBucket bucket))
+                    {
+                        bucket = new PreviewBucket(candidate, materialGroup.Key);
+                        buckets.Add(bucketKey, bucket);
+                    }
+
+                    bucket.PropertyRefIds.Add(propertyRefNo);
+                    bucket.SourceDescriptions.Add(candidate.SourceDescription);
+                    bucket.MemberIds.AddRange(materialGroup.Value);
+                    foreach (int memberId in materialGroup.Value)
+                        bucket.SourcePropertyRefByMember[memberId] = propertyRefNo;
+                }
             }
 
             foreach (PreviewBucket bucket in buckets.Values.OrderBy(item => item.Candidate.SortKey))
@@ -107,7 +143,7 @@ namespace StaadSteelApp.Core.Advance
 
             if (preview == null || preview.Groups.Count == 0)
             {
-                message = "Run Preview first. No legacy Pipe/Tube groups are ready to convert.";
+                message = "Run Preview first. No Pipe/Tube groups are ready to convert.";
                 return false;
             }
 
@@ -128,6 +164,12 @@ namespace StaadSteelApp.Core.Advance
 
                 try
                 {
+                    if (!TryValidatePreviewGroup(propertyObj, group, out string validationError))
+                    {
+                        errors.AppendLine($"{group.DisplayName}: {validationError}");
+                        continue;
+                    }
+
                     SectionInfo info = BuildSectionInfo(group);
                     int propertyId = SectionUptModule.GetOrCreateUPTSection(openStaad, info, CheckPropertyExists);
                     if (propertyId <= 0)
@@ -136,7 +178,13 @@ namespace StaadSteelApp.Core.Advance
                         continue;
                     }
 
-                    if (!TryAssignAndVerify(propertyObj, memberIds, propertyId, out string assignError))
+                    if (!AdvanceMemberAssignmentService.TryReassignPropertyPreservingMaterial(
+                            propertyObj,
+                            memberIds,
+                            propertyId,
+                            group.MaterialName,
+                            out _,
+                            out string assignError))
                     {
                         errors.AppendLine($"{group.DisplayName}: {assignError}");
                         continue;
@@ -162,7 +210,7 @@ namespace StaadSteelApp.Core.Advance
                 return false;
             }
 
-            message = $"Converted {convertedMemberCount} members across {convertedGroups} groups.";
+            message = $"Converted {convertedMemberCount} members across {convertedGroups} groups. Section and Material assignments were verified.";
             if (!string.IsNullOrWhiteSpace(errorText))
                 message += "\n\nIssues:\n" + errorText;
 
@@ -175,7 +223,7 @@ namespace StaadSteelApp.Core.Advance
                 return "No preview data.";
 
             var sb = new StringBuilder();
-            sb.AppendLine("Eligible legacy sections:");
+            sb.AppendLine("Eligible sections:");
             if (preview.Groups.Count == 0)
             {
                 sb.AppendLine("- None");
@@ -185,15 +233,18 @@ namespace StaadSteelApp.Core.Advance
                 foreach (AdvanceUptConversionGroup group in preview.Groups)
                 {
                     sb.AppendLine(
-                        $"- {group.DisplayName}: {group.MemberIds.Count} members, {group.LegacyPropertyRefIds.Count} legacy Ref IDs");
+                        $"- {group.SourceDescription} -> {group.DisplayName} [{group.MaterialName}]: {group.MemberIds.Count} members, {group.LegacyPropertyRefIds.Count} source Ref IDs");
                 }
             }
 
             sb.AppendLine();
             sb.AppendLine("Skipped:");
             sb.AppendLine($"- Already UPT: {preview.AlreadyUptMemberCount} members");
-            sb.AppendLine($"- Not Pipe/Tube: {preview.NotPipeTubeMemberCount} members");
-            sb.AppendLine($"- Could not read dimensions: {preview.UnreadableMemberCount + preview.InvalidDimensionMemberCount} members");
+            sb.AppendLine($"- Tapered D1/D2 differ by more than {DimensionToleranceMm:0.###} mm: {preview.NonUniformTaperedMemberCount} members");
+            sb.AppendLine($"- Unsupported tapered subtype: {preview.UnsupportedTaperedSubtypeMemberCount} members");
+            sb.AppendLine($"- Not a supported Pipe/Tube source: {preview.NotPipeTubeMemberCount} members");
+            sb.AppendLine($"- Unreadable or invalid dimensions: {preview.UnreadableMemberCount + preview.InvalidDimensionMemberCount} members");
+            sb.AppendLine($"- Material could not be preserved safely: {preview.UnsafeMaterialMemberCount} members");
 
             if (!string.IsNullOrWhiteSpace(preview.WarningText))
             {

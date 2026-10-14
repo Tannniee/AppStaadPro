@@ -103,6 +103,11 @@ namespace StaadSteelApp.Core
             {
                if (h1 > 0) return "Rod-D" + FmtNum(h1);
             }
+            else if (type == eFramePropType.Trapezoidal)
+            {
+               if (h1 > 0 && h2 > 0 && bf > 0)
+                   return "Trap-" + FmtNum(h1) + "x" + FmtNum(h2) + "x" + FmtNum(bf);
+            }
             else // Beam or Tapered
             {
                 if (h1 <= 0 || tw <= 0 || bf <= 0 || tf <= 0) return "";

@@ -8,13 +8,15 @@ namespace StaadSteelApp
     public static class SectionClipboard
     {
         public static SectionInfo Data { get; private set; }
+        public static SectionTransferContext TransferContext { get; private set; }
         public static string DisplayText { get; private set; } = "";
 
         public static bool HasData => Data != null;
 
-        public static void Set(SectionInfo info)
+        public static void Set(SectionInfo info, SectionTransferContext transferContext = null)
         {
             Data = Clone(info);
+            TransferContext = transferContext?.Clone();
             DisplayText = info == null ? "" : (info.FullName ?? info.Name ?? "");
         }
 
@@ -23,9 +25,15 @@ namespace StaadSteelApp
             return Clone(Data);
         }
 
+        public static SectionTransferContext GetTransferContextCopy()
+        {
+            return TransferContext?.Clone();
+        }
+
         public static void Clear()
         {
             Data = null;
+            TransferContext = null;
             DisplayText = "";
         }
 

@@ -11,6 +11,9 @@ namespace StaadSteelApp.Core.Advance
         public IReadOnlyList<AdvanceSectionMergeGroup> Groups => _groups;
         public int TotalUsedSectionGroups { get; internal set; }
         public int UniqueSectionGroupCount { get; internal set; }
+        public int UnsafeMaterialMemberCount { get; internal set; }
+        public int UnsafeMaterialSectionGroupCount { get; internal set; }
+        public string WarningText { get; internal set; } = string.Empty;
         public int DuplicateSectionGroupCount => _groups.Count;
         public int DuplicateMemberCount => _groups.Sum(group => group.MemberIds.Count);
 
@@ -25,6 +28,7 @@ namespace StaadSteelApp.Core.Advance
     {
         public string DisplayName { get; internal set; } = string.Empty;
         public int TargetPropertyId { get; internal set; }
+        public string MaterialName { get; internal set; } = string.Empty;
         public IReadOnlyList<int> PropertyIds { get; internal set; } = Array.Empty<int>();
         public IReadOnlyList<int> MemberIds { get; internal set; } = Array.Empty<int>();
     }

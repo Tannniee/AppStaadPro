@@ -20,9 +20,13 @@ namespace StaadSteelApp
         private readonly CheckBox _chkAlignX;
         private readonly CheckBox _chkAlignY;
         private readonly CheckBox _chkAlignZ;
+        private readonly RadioButton _rdoAlignNodes;
+        private readonly RadioButton _rdoCopyNodes;
 
-        public override string ActionText => "Align selected nodes (template/manual)";
-        public override string ApplyText => "Align Nodes";
+        public override string ActionText => "Align / copy selected nodes (template/manual)";
+        public override string ApplyText => _rdoCopyNodes != null && _rdoCopyNodes.Checked
+            ? "Copy Nodes"
+            : "Align Nodes";
 
         public TemplateAlignPanel()
         {
@@ -46,6 +50,11 @@ namespace StaadSteelApp
             _chkAlignX = AddCheck(this, "_chkAlignX", "X", 90, 102, true, InputChanged);
             _chkAlignY = AddCheck(this, "_chkAlignY", "Y", 140, 102, false, InputChanged);
             _chkAlignZ = AddCheck(this, "_chkAlignZ", "Z", 190, 102, false, InputChanged);
+
+            AddLabel(this, "_lblResultMode", "Result", 2, 136);
+            var resultGroup = AddPanel(this, "_panelResultMode", 90, 130, 232, 25);
+            _rdoAlignNodes = AddRadio(resultGroup, "_rdoAlignNodes", "Align (move)", 0, true, CopyModeChanged);
+            _rdoCopyNodes = AddRadio(resultGroup, "_rdoCopyNodes", "Copy (new nodes)", 104, false, CopyModeChanged);
 
             _txtTemplateNode.TextChanged += InputChanged;
             _txtTargetX.TextChanged += InputChanged;
@@ -75,6 +84,14 @@ namespace StaadSteelApp
                 return Error("Template mode requires at least 1 selected node.");
 
             bool useManualCoordinates = _rdoTemplateFromCoordinates.Checked;
+            bool copyNodes = _rdoCopyNodes.Checked;
+            if (copyNodes)
+            {
+                return Info(useManualCoordinates
+                    ? "New nodes are copied to entered X/Y/Z values on checked axes; originals stay unchanged."
+                    : "New nodes are copied to template node coordinates on checked axes; originals stay unchanged.");
+            }
+
             return Info(useManualCoordinates
                 ? "Selected nodes are moved to entered X/Y/Z values on checked axes."
                 : "Selected nodes are moved to match template node coordinates on checked axes.");
@@ -98,8 +115,9 @@ namespace StaadSteelApp
             }
 
             bool ok;
-            int updatedCount;
+            int affectedCount;
             string message;
+            bool copyNodes = _rdoCopyNodes.Checked;
             if (_rdoTemplateFromCoordinates.Checked)
             {
                 if (!TryReadCoordinateValue(_txtTargetX.Text, alignX, "X", out double targetX) ||
@@ -107,16 +125,27 @@ namespace StaadSteelApp
                     !TryReadCoordinateValue(_txtTargetZ.Text, alignZ, "Z", out double targetZ))
                     return false;
 
-                ok = AdvanceService.TryAlignNodesToCoordinates(
-                    SelectedNodes,
-                    alignX,
-                    targetX,
-                    alignY,
-                    targetY,
-                    alignZ,
-                    targetZ,
-                    out updatedCount,
-                    out message);
+                ok = copyNodes
+                    ? AdvanceService.TryCopyNodesToCoordinates(
+                        SelectedNodes,
+                        alignX,
+                        targetX,
+                        alignY,
+                        targetY,
+                        alignZ,
+                        targetZ,
+                        out affectedCount,
+                        out message)
+                    : AdvanceService.TryAlignNodesToCoordinates(
+                        SelectedNodes,
+                        alignX,
+                        targetX,
+                        alignY,
+                        targetY,
+                        alignZ,
+                        targetZ,
+                        out affectedCount,
+                        out message);
             }
             else
             {
@@ -126,14 +155,23 @@ namespace StaadSteelApp
                     return false;
                 }
 
-                ok = AdvanceService.TryAlignNodesToTemplate(
-                    SelectedNodes,
-                    templateNodeId,
-                    alignX,
-                    alignY,
-                    alignZ,
-                    out updatedCount,
-                    out message);
+                ok = copyNodes
+                    ? AdvanceService.TryCopyNodesToTemplate(
+                        SelectedNodes,
+                        templateNodeId,
+                        alignX,
+                        alignY,
+                        alignZ,
+                        out affectedCount,
+                        out message)
+                    : AdvanceService.TryAlignNodesToTemplate(
+                        SelectedNodes,
+                        templateNodeId,
+                        alignX,
+                        alignY,
+                        alignZ,
+                        out affectedCount,
+                        out message);
             }
 
             if (!ok)
@@ -142,7 +180,9 @@ namespace StaadSteelApp
                 return false;
             }
 
-            Context.ShowSuccess($"Align completed. Updated nodes: {updatedCount}.\n{message}");
+            string operation = copyNodes ? "Copy" : "Align";
+            string countLabel = copyNodes ? "Created nodes" : "Updated nodes";
+            Context.ShowSuccess($"{operation} completed. {countLabel}: {affectedCount}.\n{message}");
             Context.RefreshSelection();
             return true;
         }
@@ -167,6 +207,12 @@ namespace StaadSteelApp
 
         private void InputChanged(object sender, EventArgs e)
         {
+            NotifyHintChanged();
+        }
+
+        private void CopyModeChanged(object sender, EventArgs e)
+        {
+            Context?.RequestActionUiUpdate();
             NotifyHintChanged();
         }
 

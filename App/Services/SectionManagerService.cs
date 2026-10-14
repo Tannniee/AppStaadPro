@@ -28,6 +28,55 @@ namespace StaadSteelApp.Core
         public double FirePaintThickness { get; set; } // mm
         public double FirePaintVolume { get; set; } // L
         public double FirePaintMass { get; set; } // kg
+        internal SectionCoatingDimensions CoatingDimensions { get; set; } = new SectionCoatingDimensions();
+        public List<SectionPlateMass> PlateMasses { get; } = new List<SectionPlateMass>();
+    }
+
+    internal sealed class SectionCoatingDimensions
+    {
+        public double WebDepthMm { get; set; }
+        public double FlangeWidthMm { get; set; }
+        public double WebThicknessMm { get; set; }
+        public double FlangeThicknessMm { get; set; }
+        public double PipeOutsideDiameterMm { get; set; }
+        public double PipeThicknessMm { get; set; }
+        public double BoxAMm { get; set; }
+        public double BoxBMm { get; set; }
+        public double BoxThicknessAMm { get; set; }
+        public double BoxThicknessBMm { get; set; }
+    }
+
+    public class SectionPlateMass
+    {
+        public double Thickness { get; set; } // mm
+        public int Count { get; set; }
+        public double TotalLength { get; set; } // m
+        public double Mass { get; set; } // kg
+    }
+
+    public sealed class SectionMassBreakdownOptions
+    {
+        private readonly HashSet<int> _rolledSectionIds;
+
+        public SectionMassBreakdownOptions(IEnumerable<int> rolledSectionIds)
+        {
+            _rolledSectionIds = new HashSet<int>(rolledSectionIds ?? Enumerable.Empty<int>());
+        }
+
+        public static SectionMassBreakdownOptions Empty { get; } = new SectionMassBreakdownOptions(null);
+
+        public bool IsRolled(SectionStat stat)
+        {
+            return stat != null && _rolledSectionIds.Contains(stat.Id);
+        }
+    }
+
+    internal sealed class SectionPlateComponentSpec
+    {
+        public double Thickness { get; set; } // mm
+        public int Count { get; set; }
+        public double LengthMultiplier { get; set; }
+        public double AreaPerLength { get; set; } // m2
     }
 
     public enum ASTMA123Category

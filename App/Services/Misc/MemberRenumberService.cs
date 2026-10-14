@@ -28,7 +28,12 @@ namespace StaadSteelApp.Core.Misc
             if (beamIds.Length == 0)
                 return ServiceOperationResult.Info(ResultTitle, "No analytical members found in STAAD.");
 
-            if (!TryBuildMemberGroups(propertyObj, beamIds, out List<MemberRefItem> members, out string groupError))
+            if (!TryBuildMemberGroups(
+                    propertyObj,
+                    beamIds,
+                    out List<MemberRefItem> members,
+                    out int missingSectionCount,
+                    out string groupError))
                 return ServiceOperationResult.Error(ResultTitle, groupError);
 
             List<RenumberPair> finalPairs = BuildFinalPairs(members);
@@ -39,36 +44,44 @@ namespace StaadSteelApp.Core.Misc
             {
                 return ServiceOperationResult.Info(
                     ResultTitle,
-                    $"Members are already ordered by property Ref ID. Checked {finalPairs.Count} members across {members.Select(item => item.PropertyRefNo).Distinct().Count()} groups.");
+                    BuildAlreadyOrderedMessage(finalPairs.Count, members, missingSectionCount));
             }
 
             if (!TryRenumberInTwoPasses(geometry, finalPairs, out string renumberError))
                 return ServiceOperationResult.Error(ResultTitle, renumberError);
 
-            int groupCount = members.Select(item => item.PropertyRefNo).Distinct().Count();
+            int groupCount = members
+                .Where(item => item.PropertyRefNo > 0)
+                .Select(item => item.PropertyRefNo)
+                .Distinct()
+                .Count();
             return ServiceOperationResult.Success(
                 ResultTitle,
-                $"Renumbered {finalPairs.Count} members across {groupCount} property Ref ID groups. New range: 1 To {finalPairs.Count}.");
+                BuildSuccessMessage(finalPairs.Count, groupCount, missingSectionCount));
         }
 
         private static bool TryBuildMemberGroups(
             object propertyObj,
             int[] beamIds,
             out List<MemberRefItem> members,
+            out int missingSectionCount,
             out string error)
         {
             members = new List<MemberRefItem>(beamIds.Length);
+            missingSectionCount = 0;
             var errors = new StringBuilder();
 
             foreach (int beamId in beamIds)
             {
-                if (OpenStaadPropertyAdapter.TryGetBeamSectionPropertyRefNoFromProperty(
+                if (OpenStaadPropertyAdapter.TryGetBeamSectionPropertyRefNoAllowMissingFromProperty(
                         propertyObj,
                         beamId,
                         out int propertyRefNo,
                         out string refError))
                 {
                     members.Add(new MemberRefItem(beamId, propertyRefNo));
+                    if (propertyRefNo == 0)
+                        missingSectionCount++;
                     continue;
                 }
 
@@ -92,13 +105,43 @@ namespace StaadSteelApp.Core.Misc
 
             foreach (MemberRefItem member in members
                          .GroupBy(item => item.PropertyRefNo)
-                         .OrderBy(group => group.Key)
+                         .OrderBy(group => group.Key == 0 ? 1 : 0)
+                         .ThenBy(group => group.Key)
                          .SelectMany(group => group.OrderBy(item => item.MemberId)))
             {
                 pairs.Add(new RenumberPair(member.MemberId, nextId++));
             }
 
             return pairs;
+        }
+
+        private static string BuildAlreadyOrderedMessage(
+            int memberCount,
+            IEnumerable<MemberRefItem> members,
+            int missingSectionCount)
+        {
+            int groupCount = members
+                .Where(item => item.PropertyRefNo > 0)
+                .Select(item => item.PropertyRefNo)
+                .Distinct()
+                .Count();
+
+            string message =
+                $"Members are already ordered by property Ref ID. Checked {memberCount} members across {groupCount} assigned-section groups.";
+            if (missingSectionCount > 0)
+                message += $" Missing-section members are already last: {missingSectionCount}.";
+
+            return message;
+        }
+
+        private static string BuildSuccessMessage(int memberCount, int groupCount, int missingSectionCount)
+        {
+            string message =
+                $"Renumbered {memberCount} members across {groupCount} assigned-section groups. New range: 1 To {memberCount}.";
+            if (missingSectionCount > 0)
+                message += $" Missing-section members placed last: {missingSectionCount}.";
+
+            return message;
         }
 
         private static bool TryRenumberInTwoPasses(object geometry, List<RenumberPair> finalPairs, out string error)

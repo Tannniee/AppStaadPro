@@ -391,7 +391,9 @@ namespace StaadSteelApp
 
             DialogResult confirm = TopMostMessageBox.Show(
                 this,
-                "Renumber all analytical members by property Ref ID?\nThis changes member numbers in STAAD.",
+                "Renumber all analytical members by property Ref ID?\n" +
+                "Members without an assigned section will be placed last.\n" +
+                "This changes member numbers in STAAD.",
                 "Renumber",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question);

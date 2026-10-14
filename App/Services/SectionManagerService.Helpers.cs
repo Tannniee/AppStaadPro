@@ -32,7 +32,42 @@ namespace StaadSteelApp.Core
                 return $"TAPERED-{propId}";
             }
 
-            if (new[] { 610, 611, 612, 616, 670, 698 }.Contains(retType))
+            if (retType == 698)
+            {
+                double h1mm = GetAt(props, 0) * 1000.0;
+                double h2mm = GetAt(props, 2, GetAt(props, 0)) * 1000.0;
+                double twmm = GetAt(props, 1) * 1000.0;
+                double bfmm = GetAt(props, 3) * 1000.0;
+                double tfmm = GetAt(props, 4) * 1000.0;
+                double bfbmm = GetAt(props, 5, GetAt(props, 3)) * 1000.0;
+                double tfbmm = GetAt(props, 6, GetAt(props, 4)) * 1000.0;
+
+                string uptIName = SectionNamingService.GenerateSectionName(
+                    eFramePropType.I,
+                    h1mm, h2mm, twmm, bfmm, tfmm, bfbmm, tfbmm, 0);
+
+                if (!string.IsNullOrWhiteSpace(uptIName))
+                    return uptIName;
+            }
+
+            if (retType == 690)
+            {
+                double hmm = GetAt(props, 1, depth) * 1000.0;
+                double twmm = GetAt(props, 2, tw) * 1000.0;
+                double bfmm = GetAt(props, 3, width) * 1000.0;
+                double tfmm = GetAt(props, 4, tf) * 1000.0;
+                double bfbmm = GetAt(props, 10, GetAt(props, 3, width)) * 1000.0;
+                double tfbmm = GetAt(props, 11, GetAt(props, 4, tf)) * 1000.0;
+
+                string uptWideFlangeName = SectionNamingService.GenerateSectionName(
+                    eFramePropType.I,
+                    hmm, hmm, twmm, bfmm, tfmm, bfbmm, tfbmm, 0);
+
+                if (!string.IsNullOrWhiteSpace(uptWideFlangeName))
+                    return uptWideFlangeName;
+            }
+
+            if (new[] { 610, 611, 612, 616, 670 }.Contains(retType))
             {
                 double hmm = GetAt(props, 1, depth) * 1000.0;
                 double bfmm = GetAt(props, 2, width) * 1000.0;
@@ -53,7 +88,7 @@ namespace StaadSteelApp.Core
         private static string GetTypeName(int retType, string secName)
         {
             if (retType == 680) return "Tapered";
-            if (new[] { 610, 611, 612, 616, 670, 698 }.Contains(retType)) return "I-Section";
+            if (new[] { 610, 611, 612, 616, 670, 690, 698 }.Contains(retType)) return "I-Section";
             if (new[] { 620, 673, 694, 61100 }.Contains(retType)) return "Tee";
             if (new[] { 630, 631, 691 }.Contains(retType)) return "Channel";
             if (new[] { 640, 692 }.Contains(retType)) return "Angle";
@@ -115,6 +150,32 @@ namespace StaadSteelApp.Core
             }
 
             return false;
+        }
+
+        internal static bool IsSteelForMassBreakdown(SectionStat stat)
+        {
+            if (stat == null)
+                return false;
+
+            string material = (stat.Material ?? string.Empty).Trim().ToUpperInvariant();
+
+            // Material name is more reliable than the density fallback. When an
+            // OpenSTAAD density call fails, GetDensityKgM3 deliberately returns
+            // 7850 kg/m3; that fallback must not turn known non-steel materials
+            // into steel in Mass Breakdown.
+            if (material.Contains("CONC") ||
+                material.Contains("ALUM") ||
+                material.Contains("WOOD") ||
+                material.Contains("TIMBER"))
+            {
+                return false;
+            }
+
+            if (material.Contains("STEEL"))
+                return true;
+
+            // Keep custom steel grades such as Q345, S355, and A992 working.
+            return stat.Density >= 3000;
         }
 
         private static ASTMA123Category GetCategoryFromType(string sectionType)

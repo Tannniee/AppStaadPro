@@ -44,5 +44,42 @@ namespace StaadSteelApp.Core.Interop
 
             return false;
         }
+
+        internal static bool TryGetProcessId(object openStaad, out int processId, out string error)
+        {
+            processId = 0;
+            error = string.Empty;
+
+            if (!ComInvoke.TryInvoke(openStaad, "GetProcessId", out object result, out error))
+                return false;
+
+            if (ComResult.TryToInt32(result, out processId) && processId > 0)
+                return true;
+
+            error = "OpenSTAAD GetProcessId returned a non-positive or non-numeric value.";
+            return false;
+        }
+
+        internal static bool TryGetMainWindowHandle(object openStaad, out long mainWindowHandle, out string error)
+        {
+            mainWindowHandle = 0;
+            error = string.Empty;
+
+            if (!ComInvoke.TryInvoke(openStaad, "GetMainWindowHandle", out object result, out error))
+                return false;
+
+            try
+            {
+                mainWindowHandle = Convert.ToInt64(result);
+                if (mainWindowHandle > 0)
+                    return true;
+            }
+            catch
+            {
+            }
+
+            error = "OpenSTAAD GetMainWindowHandle returned a non-positive or non-numeric value.";
+            return false;
+        }
     }
 }

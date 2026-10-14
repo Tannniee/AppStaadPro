@@ -14,6 +14,9 @@ namespace StaadSteelApp.Core.Advance
         public int NotPipeTubeMemberCount { get; internal set; }
         public int UnreadableMemberCount { get; internal set; }
         public int InvalidDimensionMemberCount { get; internal set; }
+        public int NonUniformTaperedMemberCount { get; internal set; }
+        public int UnsupportedTaperedSubtypeMemberCount { get; internal set; }
+        public int UnsafeMaterialMemberCount { get; internal set; }
         public string WarningText { get; internal set; } = string.Empty;
 
         public int EligibleMemberCount => _groups.Sum(group => group.MemberIds.Count);
@@ -28,6 +31,7 @@ namespace StaadSteelApp.Core.Advance
 
     public sealed class AdvanceUptConversionGroup
     {
+        public string SourceDescription { get; internal set; } = string.Empty;
         public string DisplayName { get; internal set; } = string.Empty;
         public string UptPropertyName { get; internal set; } = string.Empty;
         public AdvanceUptConversionShape Shape { get; internal set; }
@@ -35,8 +39,12 @@ namespace StaadSteelApp.Core.Advance
         public double WidthMm { get; internal set; }
         public double ThicknessMm { get; internal set; }
         public double InnerDiameterMm { get; internal set; }
+        public string MaterialName { get; internal set; } = string.Empty;
         public IReadOnlyList<int> MemberIds { get; internal set; } = Array.Empty<int>();
         public IReadOnlyList<int> LegacyPropertyRefIds { get; internal set; } = Array.Empty<int>();
+        internal string SourceCandidateKey { get; set; } = string.Empty;
+        internal IReadOnlyDictionary<int, int> SourcePropertyRefByMember { get; set; } =
+            new Dictionary<int, int>();
     }
 
     public enum AdvanceUptConversionShape

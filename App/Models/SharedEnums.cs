@@ -17,6 +17,14 @@ namespace StaadSteelApp.Core
         Variable = 14,
         ISection = 15,
         Prismatic = 16,
+        Trapezoidal = 17,
         Legacy = 99
+    }
+
+    public enum TaperedTubeShape
+    {
+        Unknown = -1,
+        Round = 0,
+        Square = 5
     }
 }

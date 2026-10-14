@@ -33,9 +33,18 @@ namespace StaadSteelApp
             else if (typeStr == "Angle" || typeStr == "ANGLE") info.PropType = eFramePropType.Angle;
             else if (typeStr == "2L" || typeStr == "DOUBLE ANGLE") info.PropType = eFramePropType.DblAngle;
             else if (typeStr == "2C") info.PropType = eFramePropType.DbChannel;
-            else if (typeStr == "Tapered Tube") info.PropType = eFramePropType.Pipe; // Might be incorrect, but keeping legacy mapping
+            else if (typeStr == "Tapered Pipe")
+            {
+                info.PropType = eFramePropType.Pipe;
+                info.TaperedTubeShape = TaperedTubeShape.Round;
+            }
+            else if (typeStr == "Tapered Tube")
+            {
+                info.PropType = eFramePropType.Pipe;
+                info.TaperedTubeShape = TaperedTubeShape.Square;
+            }
 
-            else if (typeStr == "Trapezoidal") info.PropType = eFramePropType.General;
+            else if (typeStr == "Trapezoidal") info.PropType = eFramePropType.Trapezoidal;
             else if (typeStr == "General" || typeStr == "GENERAL") info.PropType = eFramePropType.General;
             else if (typeStr == "Legacy") info.PropType = eFramePropType.Legacy;
             else if (typeStr == "WIDE FLANGE") info.PropType = eFramePropType.I;

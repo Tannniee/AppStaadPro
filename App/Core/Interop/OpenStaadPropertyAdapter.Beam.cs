@@ -69,6 +69,30 @@ namespace StaadSteelApp.Core.Interop
 
         internal static bool TryGetBeamSectionPropertyRefNoFromProperty(object propertyObj, int memberNo, out int propertyRefNo, out string error)
         {
+            if (!TryGetBeamSectionPropertyRefNoAllowMissingFromProperty(
+                    propertyObj,
+                    memberNo,
+                    out propertyRefNo,
+                    out error))
+            {
+                return false;
+            }
+
+            if (propertyRefNo == 0)
+            {
+                error = $"GetBeamSectionPropertyRefNo returned invalid ref '0' for member {memberNo}.";
+                return false;
+            }
+
+            return true;
+        }
+
+        internal static bool TryGetBeamSectionPropertyRefNoAllowMissingFromProperty(
+            object propertyObj,
+            int memberNo,
+            out int propertyRefNo,
+            out string error)
+        {
             propertyRefNo = 0;
             error = string.Empty;
 
@@ -81,8 +105,13 @@ namespace StaadSteelApp.Core.Interop
             if (!ComInvoke.TryInvoke(propertyObj, "GetBeamSectionPropertyRefNo", out object result, out error, new object[] { memberNo }))
                 return false;
 
-            propertyRefNo = ComResult.ToInt32(result);
-            if (propertyRefNo <= 0)
+            if (!ComResult.TryToInt32(result, out propertyRefNo))
+            {
+                error = $"GetBeamSectionPropertyRefNo returned a non-numeric value for member {memberNo}.";
+                return false;
+            }
+
+            if (propertyRefNo < 0)
             {
                 error = $"GetBeamSectionPropertyRefNo returned invalid ref '{propertyRefNo}' for member {memberNo}.";
                 return false;

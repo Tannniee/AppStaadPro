@@ -28,6 +28,15 @@ namespace StaadSteelApp.Core.Interop
             return IsAssignSuccess(result);
         }
 
+        internal static bool TryRemoveMaterialFromBeam(object propertyObj, int beamId, out string error)
+        {
+            error = string.Empty;
+            if (!ComInvoke.TryInvoke(propertyObj, "RemoveMaterialFromBeam", out object result, out error, new object[] { beamId }))
+                return false;
+
+            return IsZeroStatusSuccess(result, out error);
+        }
+
         internal static bool TryAssignBeamProperty(object propertyObj, int[] beamIds, int propertyRefNo, out string error)
         {
             error = string.Empty;

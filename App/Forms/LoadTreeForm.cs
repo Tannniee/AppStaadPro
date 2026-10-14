@@ -6,6 +6,8 @@ namespace StaadSteelApp
 {
     public partial class LoadTreeForm : Form
     {
+        private string _boundModelKey = string.Empty;
+
         public LoadTreeForm()
         {
             InitializeComponent();
@@ -15,6 +17,14 @@ namespace StaadSteelApp
         public void RefreshTree()
         {
             LoadTree();
+        }
+
+        internal void HandleActiveModelChanged(bool connected)
+        {
+            treeLoads.Nodes.Clear();
+            _boundModelKey = string.Empty;
+            if (connected)
+                RefreshTree();
         }
 
         private void btnRefresh_Click(object sender, EventArgs e)
@@ -36,14 +46,18 @@ namespace StaadSteelApp
 
         private void LoadTree()
         {
+            _boundModelKey = string.Empty;
             try
             {
+                if (!StaadManager.TryGetConnection(out StaadConnectionSnapshot connection, out string connectionError))
+                    throw new InvalidOperationException(connectionError);
+
                 UseWaitCursor = true;
                 treeLoads.BeginUpdate();
                 treeLoads.Nodes.Clear();
 
                 var root = new TreeNode("Load Cases Details");
-                foreach (var loadCase in LoadService.GetPrimaryLoadTree())
+                foreach (var loadCase in LoadService.GetPrimaryLoadTree(connection.OpenStaad))
                 {
                     string title = string.IsNullOrWhiteSpace(loadCase.Title)
                         ? loadCase.Number.ToString()
@@ -60,6 +74,7 @@ namespace StaadSteelApp
                 }
 
                 treeLoads.Nodes.Add(root);
+                _boundModelKey = connection.Identity.CacheKey;
                 root.Expand();
                 if (root.Nodes.Count > 0)
                     root.Nodes[0].Expand();
@@ -82,7 +97,20 @@ namespace StaadSteelApp
 
             try
             {
-                LoadService.HighlightLoadAssignments(item);
+                string expectedModelKey = _boundModelKey;
+                if (!StaadManager.TryGetConnection(out StaadConnectionSnapshot connection, out string connectionError))
+                    throw new InvalidOperationException(connectionError);
+
+                if (string.IsNullOrWhiteSpace(expectedModelKey) ||
+                    !string.Equals(expectedModelKey, connection.Identity.CacheKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    TopMostMessageBox.ShowWarning(
+                        "The active STAAD model changed. The load tree was refreshed; select the load item again.",
+                        "Load Tree");
+                    return;
+                }
+
+                LoadService.HighlightLoadAssignments(connection.OpenStaad, item);
             }
             catch (Exception ex)
             {

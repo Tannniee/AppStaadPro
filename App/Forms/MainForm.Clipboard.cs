@@ -62,7 +62,29 @@ namespace StaadSteelApp
                 }
             }
 
-            SectionClipboard.Set(info);
+            var transferContext = new SectionTransferContext
+            {
+                SourceModelKey = openStaad == null ? string.Empty : StaadManager.GetModelCacheKey(openStaad)
+            };
+
+            if (fromSelection && openStaad != null && info.PropertyRefNo > 0)
+            {
+                if (SectionService.TryCaptureSectionPropertyFingerprint(
+                        openStaad,
+                        info.PropertyRefNo,
+                        out SectionPropertyFingerprint fingerprint,
+                        out string fingerprintError))
+                {
+                    transferContext.SourceFingerprint = fingerprint;
+                }
+                else
+                {
+                    AppLogger.Warning(
+                        $"Copy section fingerprint was not available for property {info.PropertyRefNo}: {fingerprintError}");
+                }
+            }
+
+            SectionClipboard.Set(info, transferContext);
             UpdateClipboardUi();
             TopMostMessageBox.ShowSuccess("Section copied to clipboard.", "Success");
         }
@@ -100,7 +122,7 @@ namespace StaadSteelApp
             {
                 string selectError = "";
                 var beams = SectionService.GetSelectedBeamIDsSafe(openStaad, out selectError);
-                if (!string.IsNullOrWhiteSpace(selectError))
+                if (beams.Length == 0 && !string.IsNullOrWhiteSpace(selectError))
                 {
                     TopMostMessageBox.ShowWarning("Error reading selection: " + selectError, "Paste Warning");
                     return;
@@ -114,7 +136,10 @@ namespace StaadSteelApp
 
                 try
                 {
-                    SectionAssignmentResult result = SectionService.AssignSectionToSelection(openStaad, info);
+                    SectionAssignmentResult result = SectionService.AssignSectionToSelection(
+                        openStaad,
+                        info,
+                        SectionClipboard.GetTransferContextCopy());
                     ServiceOperationResultPresenter.Show(result);
                     if (result.Succeeded)
                         RefreshUsedSectionsListIfVisible();

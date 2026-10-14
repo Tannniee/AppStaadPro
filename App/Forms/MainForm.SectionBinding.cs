@@ -24,13 +24,14 @@ namespace StaadSteelApp
             {
                 case eFramePropType.Circle: typeStr = isUpt ? "PRISMATIC" : "Circle"; break;
                 case eFramePropType.Rectangular: typeStr = isUpt ? "TUBE" : "Rectangle"; break;
+                case eFramePropType.Trapezoidal: typeStr = "Trapezoidal"; break;
                 case eFramePropType.I: typeStr = isUpt ? "WIDE FLANGE" : "Tapered I"; break;
                 case eFramePropType.T: typeStr = isUpt ? "TEE" : "Tee"; break;
                 case eFramePropType.Channel: typeStr = isUpt ? "CHANNEL" : "Channel"; break;
                 case eFramePropType.Angle: typeStr = isUpt ? "ANGLE" : "Angle"; break;
                 case eFramePropType.DblAngle: typeStr = isUpt ? "DOUBLE ANGLE" : "2L"; break;
                 case eFramePropType.DbChannel: typeStr = "2C"; break;
-                case eFramePropType.Pipe: typeStr = isUpt ? "PIPE" : "Tapered Tube"; break;
+                case eFramePropType.Pipe: typeStr = isUpt ? "PIPE" : GetTaperedTubeUiName(info.TaperedTubeShape); break;
                 case eFramePropType.General: typeStr = isUpt ? "GENERAL" : "General"; break;
                 case eFramePropType.ISection: typeStr = "ISECTION"; break;
                 case eFramePropType.Prismatic: typeStr = "PRISMATIC"; break;
@@ -225,10 +226,13 @@ namespace StaadSteelApp
                 }
                 else
                 {
-                    if (info.PropType == eFramePropType.Pipe || info.PropType == eFramePropType.Circle)
+                    if (info.PropType == eFramePropType.Circle)
                         SetCbo("Circle");
+                    else if (info.PropType == eFramePropType.Pipe)
+                        SetCbo(GetTaperedTubeUiName(info.TaperedTubeShape));
                     else if (info.PropType == eFramePropType.Rectangular || info.PropType == eFramePropType.Box)
                         SetCbo("Rectangle");
+                    else if (info.PropType == eFramePropType.Trapezoidal) SetCbo("Trapezoidal");
                     else if (info.PropType == eFramePropType.Channel) SetCbo("Channel");
                     else if (info.PropType == eFramePropType.T) SetCbo("Tee");
                     else if (info.PropType == eFramePropType.Angle) SetCbo("Angle");
@@ -244,10 +248,7 @@ namespace StaadSteelApp
                 txtCode.Text = info.Code;
                 txtName.Text = info.Name;
 
-                if (!string.IsNullOrWhiteSpace(info.Material))
-                    cboMaterial.Text = info.Material;
-                else if (cboMaterial.Items.Count > 0)
-                    cboMaterial.SelectedIndex = 0;
+                SelectMaterial(info.Material);
 
                 txtH1.Text = SectionNamingService.FmtNum(info.H1);
                 txtH2.Text = SectionNamingService.FmtNum(info.H2);
@@ -302,6 +303,17 @@ namespace StaadSteelApp
             }
 
             if (cboType.Items.Count > 0) cboType.SelectedIndex = 0;
+        }
+
+        private static string GetTaperedTubeUiName(TaperedTubeShape shape)
+        {
+            if (shape == TaperedTubeShape.Round)
+                return "Tapered Pipe";
+
+            if (shape == TaperedTubeShape.Square)
+                return "Tapered Tube";
+
+            throw new SectionPropertyException("Unsupported tapered tube subtype.");
         }
     }
 }

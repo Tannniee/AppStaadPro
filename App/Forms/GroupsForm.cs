@@ -18,6 +18,10 @@ namespace StaadSteelApp
         private readonly Button _btnDelete;
         private readonly Button _btnAddSelected;
         private readonly Button _btnRemoveSelected;
+        private readonly Timer _highlightTimer;
+        private string[] _pendingHighlightGroupNames = Array.Empty<string>();
+        private string _pendingHighlightModelKey = string.Empty;
+        private string _boundModelKey = string.Empty;
         private bool _isBinding;
         private bool _locationInitialized;
         private bool _suppressLocationSave;
@@ -45,9 +49,13 @@ namespace StaadSteelApp
                 Location = new Point(10, 20),
                 Size = new Size(206, 216),
                 HorizontalScrollbar = true,
-                IntegralHeight = false
+                IntegralHeight = false,
+                SelectionMode = SelectionMode.MultiExtended
             };
             _lstGroups.SelectedIndexChanged += lstGroups_SelectedIndexChanged;
+
+            _highlightTimer = new Timer { Interval = 120 };
+            _highlightTimer.Tick += HighlightTimer_Tick;
 
             _grpGroups.Controls.Add(_lstGroups);
             Controls.Add(_grpGroups);
@@ -73,7 +81,7 @@ namespace StaadSteelApp
                 Location = new Point(12, 298),
                 Size = new Size(70, 28)
             };
-            _btnRefresh.Click += (s, e) => RefreshGroups(SelectedGroupName);
+            _btnRefresh.Click += (s, e) => RefreshGroups(SelectedGroupNames);
             Controls.Add(_btnRefresh);
 
             _btnCreate = new Button
@@ -115,16 +123,12 @@ namespace StaadSteelApp
             Move += (s, e) => SaveLocation();
         }
 
-        private string SelectedGroupName
-        {
-            get
-            {
-                if (_lstGroups.SelectedItem is GroupEntry entry)
-                    return entry.Name;
-
-                return (_txtName.Text ?? string.Empty).Trim();
-            }
-        }
+        private string[] SelectedGroupNames => _lstGroups.SelectedItems
+            .OfType<GroupEntry>()
+            .Select(entry => entry.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         protected override void OnShown(EventArgs e)
         {
@@ -168,16 +172,52 @@ namespace StaadSteelApp
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            _highlightTimer.Stop();
             SaveLocation();
             base.OnFormClosing(e);
         }
 
-        private void RefreshGroups(string selectedGroupName = null)
+        protected override void OnFormClosed(FormClosedEventArgs e)
         {
+            _highlightTimer.Dispose();
+            base.OnFormClosed(e);
+        }
+
+        internal void HandleActiveModelChanged(bool connected)
+        {
+            _highlightTimer.Stop();
+            _pendingHighlightGroupNames = Array.Empty<string>();
+            _pendingHighlightModelKey = string.Empty;
+            _boundModelKey = string.Empty;
+            _isBinding = true;
             try
             {
-                IReadOnlyList<GroupEntry> groups = GroupService.GetMemberGroups();
-                string selectedName = string.IsNullOrWhiteSpace(selectedGroupName) ? SelectedGroupName : selectedGroupName;
+                _lstGroups.Items.Clear();
+                _txtName.Clear();
+                _grpGroups.Text = "Member Groups (0)";
+            }
+            finally
+            {
+                _isBinding = false;
+            }
+
+            if (connected && Visible)
+                RefreshGroups(Array.Empty<string>());
+        }
+
+        private void RefreshGroups(IEnumerable<string> selectedGroupNames = null)
+        {
+            _boundModelKey = string.Empty;
+            try
+            {
+                if (!StaadManager.TryGetConnection(out StaadConnectionSnapshot connection, out string connectionError))
+                    throw new InvalidOperationException(connectionError);
+
+                IReadOnlyList<GroupEntry> groups = GroupService.GetMemberGroups(connection.OpenStaad);
+                string[] selectedNames = (selectedGroupNames ?? SelectedGroupNames)
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
 
                 _isBinding = true;
                 _lstGroups.BeginUpdate();
@@ -190,7 +230,8 @@ namespace StaadSteelApp
                     }
 
                     _grpGroups.Text = "Member Groups (" + groups.Count + ")";
-                    SelectGroupByName(selectedName);
+                    SelectGroupsByName(selectedNames);
+                    _boundModelKey = connection.Identity.CacheKey;
                 }
                 finally
                 {
@@ -204,35 +245,67 @@ namespace StaadSteelApp
             }
         }
 
-        private void SelectGroupByName(string groupName)
+        private void SelectGroupsByName(IEnumerable<string> groupNames)
         {
-            if (string.IsNullOrWhiteSpace(groupName))
+            var names = new HashSet<string>(
+                (groupNames ?? Enumerable.Empty<string>()).Where(name => !string.IsNullOrWhiteSpace(name)),
+                StringComparer.CurrentCultureIgnoreCase);
+            if (names.Count == 0)
                 return;
 
+            GroupEntry activeEntry = null;
             for (int i = 0; i < _lstGroups.Items.Count; i++)
             {
                 if (_lstGroups.Items[i] is GroupEntry entry &&
-                    string.Equals(entry.Name, groupName, StringComparison.CurrentCultureIgnoreCase))
+                    names.Contains(entry.Name))
                 {
-                    _lstGroups.SelectedIndex = i;
-                    _txtName.Text = entry.Name;
-                    return;
+                    _lstGroups.SetSelected(i, true);
+                    activeEntry = entry;
                 }
             }
+
+            if (names.Count == 1 && activeEntry != null)
+                _txtName.Text = activeEntry.Name;
         }
 
         private void lstGroups_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (!(_lstGroups.SelectedItem is GroupEntry entry))
+            if (_isBinding)
                 return;
 
-            _txtName.Text = entry.Name;
-            if (_isBinding)
+            string[] selectedNames = SelectedGroupNames;
+            _grpGroups.Text = selectedNames.Length > 1
+                ? $"Member Groups ({_lstGroups.Items.Count}) - Selected {selectedNames.Length}"
+                : $"Member Groups ({_lstGroups.Items.Count})";
+
+            if (selectedNames.Length == 1)
+                _txtName.Text = selectedNames[0];
+            else if (selectedNames.Length > 1)
+                _txtName.Clear();
+
+            _pendingHighlightGroupNames = selectedNames;
+            _pendingHighlightModelKey = _boundModelKey;
+            _highlightTimer.Stop();
+            if (selectedNames.Length > 0)
+                _highlightTimer.Start();
+        }
+
+        private void HighlightTimer_Tick(object sender, EventArgs e)
+        {
+            _highlightTimer.Stop();
+            string[] selectedNames = _pendingHighlightGroupNames;
+            string expectedModelKey = _pendingHighlightModelKey;
+            _pendingHighlightGroupNames = Array.Empty<string>();
+            _pendingHighlightModelKey = string.Empty;
+            if (selectedNames.Length == 0 || _isBinding)
                 return;
 
             try
             {
-                GroupService.HighlightMemberGroup(entry.Name);
+                if (!TryGetBoundOpenStaad(expectedModelKey, out object openStaad, showWarning: false))
+                    return;
+
+                GroupService.HighlightMemberGroups(openStaad, selectedNames);
             }
             catch (Exception ex)
             {
@@ -242,12 +315,15 @@ namespace StaadSteelApp
 
         private void btnCreate_Click(object sender, EventArgs e)
         {
+            if (!TryGetBoundOpenStaad(_boundModelKey, out object openStaad, showWarning: true))
+                return;
+
             string groupName = (_txtName.Text ?? string.Empty).Trim();
             try
             {
-                string createdGroupName = GroupService.CreateMemberGroupFromSelection(groupName);
+                string createdGroupName = GroupService.CreateMemberGroupFromSelection(openStaad, groupName);
                 _txtName.Text = createdGroupName;
-                RefreshGroups(createdGroupName);
+                RefreshGroups(new[] { createdGroupName });
                 TopMostMessageBox.ShowSuccess("Group created.", "Groups");
             }
             catch (Exception ex)
@@ -258,12 +334,11 @@ namespace StaadSteelApp
 
         private void btnDelete_Click(object sender, EventArgs e)
         {
-            string groupName = SelectedGroupName;
-            if (string.IsNullOrWhiteSpace(groupName))
-            {
-                TopMostMessageBox.ShowWarning("Please select a group.", "Groups");
+            if (!TryGetBoundOpenStaad(_boundModelKey, out object openStaad, showWarning: true))
                 return;
-            }
+
+            if (!TryGetSingleSelectedGroupName(out string groupName))
+                return;
 
             DialogResult confirm = TopMostMessageBox.Show(
                 this,
@@ -276,7 +351,7 @@ namespace StaadSteelApp
 
             try
             {
-                GroupService.DeleteGroup(groupName);
+                GroupService.DeleteGroup(openStaad, groupName);
                 _txtName.Clear();
                 RefreshGroups();
                 TopMostMessageBox.ShowSuccess("Group deleted.", "Groups");
@@ -289,11 +364,16 @@ namespace StaadSteelApp
 
         private void btnAddSelected_Click(object sender, EventArgs e)
         {
-            string groupName = SelectedGroupName;
+            if (!TryGetBoundOpenStaad(_boundModelKey, out object openStaad, showWarning: true))
+                return;
+
+            if (!TryGetSingleSelectedGroupName(out string groupName))
+                return;
+
             try
             {
-                GroupService.AddSelectedMembersToGroup(groupName);
-                RefreshGroups(groupName);
+                GroupService.AddSelectedMembersToGroup(openStaad, groupName);
+                RefreshGroups(new[] { groupName });
                 TopMostMessageBox.ShowSuccess("Selected members added.", "Groups");
             }
             catch (Exception ex)
@@ -304,17 +384,66 @@ namespace StaadSteelApp
 
         private void btnRemoveSelected_Click(object sender, EventArgs e)
         {
-            string groupName = SelectedGroupName;
+            if (!TryGetBoundOpenStaad(_boundModelKey, out object openStaad, showWarning: true))
+                return;
+
+            if (!TryGetSingleSelectedGroupName(out string groupName))
+                return;
+
             try
             {
-                GroupService.RemoveSelectedMembersFromGroup(groupName);
-                RefreshGroups(groupName);
+                GroupService.RemoveSelectedMembersFromGroup(openStaad, groupName);
+                RefreshGroups(new[] { groupName });
                 TopMostMessageBox.ShowSuccess("Selected members removed.", "Groups");
             }
             catch (Exception ex)
             {
                 TopMostMessageBox.ShowError(ex.Message, "Groups");
             }
+        }
+
+        private bool TryGetSingleSelectedGroupName(out string groupName)
+        {
+            string[] selectedNames = SelectedGroupNames;
+            if (selectedNames.Length == 1)
+            {
+                groupName = selectedNames[0];
+                return true;
+            }
+
+            groupName = string.Empty;
+            TopMostMessageBox.ShowWarning(
+                selectedNames.Length == 0
+                    ? "Please select a group."
+                    : "Please select only one group for this operation.",
+                "Groups");
+            return false;
+        }
+
+        private bool TryGetBoundOpenStaad(string expectedModelKey, out object openStaad, bool showWarning)
+        {
+            openStaad = null;
+            if (!StaadManager.TryGetConnection(out StaadConnectionSnapshot connection, out string error))
+            {
+                if (showWarning)
+                    TopMostMessageBox.ShowWarning(error, "Groups");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(expectedModelKey) ||
+                !string.Equals(expectedModelKey, connection.Identity.CacheKey, StringComparison.OrdinalIgnoreCase))
+            {
+                if (showWarning)
+                {
+                    TopMostMessageBox.ShowWarning(
+                        "The active STAAD model changed. The group list was refreshed; please review the selection and try again.",
+                        "Groups");
+                }
+                return false;
+            }
+
+            openStaad = connection.OpenStaad;
+            return true;
         }
 
         private void SaveLocation()

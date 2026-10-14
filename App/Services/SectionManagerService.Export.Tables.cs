@@ -56,17 +56,12 @@ namespace StaadSteelApp.Core
             rowTitles.Interior.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(244, 176, 132));
 
             int c = col + 1;
-            double sumArea = 0;
-            double sumZinc = 0;
-            double sumLen = 0;
-            double sumSteel = 0;
 
             foreach (var pair in list)
             {
                 var vals = pair.Value.ToList();
                 var first = vals.First();
                 double area = vals.Sum(x => x.Perimeter * x.TotalLength);
-                double zinc = vals.Sum(x => x.ZincMass);
                 double len = vals.Sum(x => x.TotalLength);
                 double steel = vals.Sum(x => x.TotalWeight);
 
@@ -80,14 +75,9 @@ namespace StaadSteelApp.Core
                 ws.Cells[row + 2, c] = first.CoatingGrade;
                 ws.Cells[row + 3, c] = first.CoatingWeight;
                 ws.Cells[row + 4, c] = Math.Round(area, 2);
-                ws.Cells[row + 5, c] = Math.Round(zinc, 2);
+                (ws.Cells[row + 5, c] as Excel.Range).FormulaR1C1 = "=R[-1]C*R[-2]C/1000";
                 ws.Cells[row + 6, c] = Math.Round(len, 2);
                 ws.Cells[row + 7, c] = Math.Round(steel, 2);
-
-                sumArea += area;
-                sumZinc += zinc;
-                sumLen += len;
-                sumSteel += steel;
                 c++;
             }
 
@@ -95,10 +85,16 @@ namespace StaadSteelApp.Core
             var sumHeader = ws.Cells[row, c] as Excel.Range;
             sumHeader.Font.Bold = true;
             sumHeader.Interior.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(198, 224, 180));
-            ws.Cells[row + 4, c] = Math.Round(sumArea, 2);
-            ws.Cells[row + 5, c] = Math.Round(sumZinc, 2);
-            ws.Cells[row + 6, c] = Math.Round(sumLen, 2);
-            ws.Cells[row + 7, c] = Math.Round(sumSteel, 2);
+            int firstGroupColumn = col + 1;
+            int lastGroupColumn = c - 1;
+            (ws.Cells[row + 4, c] as Excel.Range).FormulaR1C1 =
+                $"=SUM(R{row + 4}C{firstGroupColumn}:R{row + 4}C{lastGroupColumn})";
+            (ws.Cells[row + 5, c] as Excel.Range).FormulaR1C1 =
+                $"=SUM(R{row + 5}C{firstGroupColumn}:R{row + 5}C{lastGroupColumn})";
+            (ws.Cells[row + 6, c] as Excel.Range).FormulaR1C1 =
+                $"=SUM(R{row + 6}C{firstGroupColumn}:R{row + 6}C{lastGroupColumn})";
+            (ws.Cells[row + 7, c] as Excel.Range).FormulaR1C1 =
+                $"=SUM(R{row + 7}C{firstGroupColumn}:R{row + 7}C{lastGroupColumn})";
 
             var zincCell = ws.Cells[row + 5, c] as Excel.Range;
             zincCell.Font.Bold = true;
@@ -110,36 +106,106 @@ namespace StaadSteelApp.Core
             return row + 9;
         }
 
-        private static int WriteMassTables(Excel.Worksheet ws, List<SectionStat> stats, int row, int col)
+        private static int WriteMassTables(
+            Excel.Worksheet ws,
+            List<SectionStat> stats,
+            int row,
+            int col,
+            SectionMassBreakdownOptions options)
         {
-            var steel = stats.Where(x => x.Density >= 3000).ToList();
-            var plateTypes = new[] { "I-Section", "Tapered" };
+            var steel = stats.Where(IsSteelForMassBreakdown).ToList();
+            options = options ?? SectionMassBreakdownOptions.Empty;
 
-            var otherGroups = steel.Where(s => !plateTypes.Contains(s.Type) && s.Type != "Circle")
+            var massItemGroups = steel.Where(options.IsRolled)
                 .GroupBy(s => s.Name)
                 .OrderBy(g => g.Key)
-                .Select(g => new KeyValuePair<string, IEnumerable<SectionStat>>(g.Key, g.AsEnumerable()))
+                .Select(g => new KeyValuePair<string, IEnumerable<MassTableItem>>(
+                    g.Key,
+                    g.Select(ToMassTableItem).ToList()))
                 .ToList();
 
-            var plateGroups = steel.Where(s => plateTypes.Contains(s.Type) && s.Thickness > 0.1)
-                .GroupBy(s => (int)Math.Round(s.Thickness))
+            var plateGroups = steel.Where(s => !options.IsRolled(s))
+                .SelectMany(GetPlateMassTableItems)
+                .GroupBy(x => (int)Math.Round(x.Thickness))
                 .OrderBy(g => g.Key)
-                .Select(g => new KeyValuePair<string, IEnumerable<SectionStat>>(g.Key + " mm", g.AsEnumerable()))
+                .Select(g => new KeyValuePair<string, IEnumerable<MassTableItem>>(
+                    g.Key + " mm",
+                    g.Select(x => x.Item).ToList()))
                 .ToList();
 
-            row = WriteMassTableByName(ws, otherGroups, "Mass Item", row, col);
+            row = WriteMassTableByName(ws, massItemGroups, "Mass Item", row, col);
             if (plateGroups.Count > 0)
-                row = WriteMassTableByName(ws, plateGroups, "Plate Thickness", row + 1, col);
+                row = WriteMassTableByName(ws, plateGroups, "Plate Thickness", row + 1, col, "Piece Count");
 
             return row;
         }
 
+        private sealed class MassTableItem
+        {
+            public int Count { get; set; }
+            public double TotalLength { get; set; }
+            public double SteelMass { get; set; }
+        }
+
+        private sealed class PlateMassTableItem
+        {
+            public double Thickness { get; set; }
+            public MassTableItem Item { get; set; }
+        }
+
+        private static MassTableItem ToMassTableItem(SectionStat stat)
+        {
+            return new MassTableItem
+            {
+                Count = stat.Count,
+                TotalLength = stat.TotalLength,
+                SteelMass = stat.TotalWeight
+            };
+        }
+
+        private static IEnumerable<PlateMassTableItem> GetPlateMassTableItems(SectionStat stat)
+        {
+            if (stat == null)
+                yield break;
+
+            if (stat.PlateMasses != null && stat.PlateMasses.Count > 0)
+            {
+                foreach (var plate in stat.PlateMasses)
+                {
+                    if (plate.Thickness <= 0 || plate.Mass <= 0)
+                        continue;
+
+                    yield return new PlateMassTableItem
+                    {
+                        Thickness = plate.Thickness,
+                        Item = new MassTableItem
+                        {
+                            Count = plate.Count,
+                            TotalLength = plate.TotalLength,
+                            SteelMass = plate.Mass
+                        }
+                    };
+                }
+                yield break;
+            }
+
+            if (stat.Thickness > 0.1)
+            {
+                yield return new PlateMassTableItem
+                {
+                    Thickness = stat.Thickness,
+                    Item = ToMassTableItem(stat)
+                };
+            }
+        }
+
         private static int WriteMassTableByName(
             Excel.Worksheet ws,
-            IEnumerable<KeyValuePair<string, IEnumerable<SectionStat>>> groups,
+            IEnumerable<KeyValuePair<string, IEnumerable<MassTableItem>>> groups,
             string title,
             int row,
-            int col)
+            int col,
+            string countLabel = "Count")
         {
             var list = groups.ToList();
             if (list.Count == 0)
@@ -153,7 +219,7 @@ namespace StaadSteelApp.Core
             leftHeader.Interior.Color = plum60;
             leftHeader.Borders.LineStyle = Excel.XlLineStyle.xlContinuous;
 
-            ws.Cells[row + 1, col] = "Count";
+            ws.Cells[row + 1, col] = countLabel;
             ws.Cells[row + 2, col] = "Total Length (m)";
             ws.Cells[row + 3, col] = "Unit Weight (kg/m)";
             ws.Cells[row + 4, col] = "Steel Mass (kg)";
@@ -162,16 +228,12 @@ namespace StaadSteelApp.Core
             rowTitles.Interior.Color = plum60;
 
             int c = col + 1;
-            double sumCount = 0;
-            double sumLen = 0;
-            double sumSteel = 0;
             foreach (var pair in list)
             {
                 var vals = pair.Value.ToList();
                 double count = vals.Sum(x => x.Count);
                 double len = vals.Sum(x => x.TotalLength);
-                double steel = vals.Sum(x => x.TotalWeight);
-                double unit = len > 1e-9 ? steel / len : 0;
+                double steel = vals.Sum(x => x.SteelMass);
 
                 ws.Cells[row, c] = pair.Key;
                 var h = ws.Cells[row, c] as Excel.Range;
@@ -182,12 +244,8 @@ namespace StaadSteelApp.Core
 
                 ws.Cells[row + 1, c] = Math.Round(count, 0);
                 ws.Cells[row + 2, c] = Math.Round(len, 2);
-                ws.Cells[row + 3, c] = Math.Round(unit, 2);
+                (ws.Cells[row + 3, c] as Excel.Range).FormulaR1C1 = "=IFERROR(R[1]C/R[-1]C,0)";
                 ws.Cells[row + 4, c] = Math.Round(steel, 2);
-
-                sumCount += count;
-                sumLen += len;
-                sumSteel += steel;
                 c++;
             }
 
@@ -195,10 +253,15 @@ namespace StaadSteelApp.Core
             var sumHeader = ws.Cells[row, c] as Excel.Range;
             sumHeader.Font.Bold = true;
             sumHeader.Interior.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(255, 204, 153));
-            ws.Cells[row + 1, c] = Math.Round(sumCount, 0);
-            ws.Cells[row + 2, c] = Math.Round(sumLen, 2);
-            ws.Cells[row + 3, c] = sumLen > 1e-9 ? Math.Round(sumSteel / sumLen, 2) : 0;
-            ws.Cells[row + 4, c] = Math.Round(sumSteel, 2);
+            int firstGroupColumn = col + 1;
+            int lastGroupColumn = c - 1;
+            (ws.Cells[row + 1, c] as Excel.Range).FormulaR1C1 =
+                $"=SUM(R{row + 1}C{firstGroupColumn}:R{row + 1}C{lastGroupColumn})";
+            (ws.Cells[row + 2, c] as Excel.Range).FormulaR1C1 =
+                $"=SUM(R{row + 2}C{firstGroupColumn}:R{row + 2}C{lastGroupColumn})";
+            (ws.Cells[row + 3, c] as Excel.Range).FormulaR1C1 = "=IFERROR(R[1]C/R[-1]C,0)";
+            (ws.Cells[row + 4, c] as Excel.Range).FormulaR1C1 =
+                $"=SUM(R{row + 4}C{firstGroupColumn}:R{row + 4}C{lastGroupColumn})";
 
             var massCell = ws.Cells[row + 4, c] as Excel.Range;
             massCell.Font.Bold = true;

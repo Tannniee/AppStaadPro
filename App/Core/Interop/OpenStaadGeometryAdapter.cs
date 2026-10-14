@@ -5,8 +5,6 @@ namespace StaadSteelApp.Core.Interop
 {
     internal static partial class OpenStaadGeometryAdapter
     {
-        private const int SingleSelectionFallbackLimit = 200;
-
         internal static bool TryGetBeamLength(object openStaad, int beamId, out double length, out string error)
         {
             length = 0.0;
@@ -334,6 +332,19 @@ namespace StaadSteelApp.Core.Interop
                 return false;
             }
 
+            if (ids.Length == 1)
+            {
+                if (ComInvoke.TryInvoke(geometry, singleMethodName, out object singleResult, out error, new object[] { ids[0] }) &&
+                    IsSelectionSuccess(singleResult))
+                {
+                    return true;
+                }
+
+                if (string.IsNullOrWhiteSpace(error))
+                    error = $"STAAD could not select {singleMethodName} ID {ids[0]}.";
+                return false;
+            }
+
             if (TrySelectManyDynamic(geometry, multipleMethodName, ids, out object result, out string dynamicError) &&
                 IsSelectionSuccess(result))
             {
@@ -346,37 +357,10 @@ namespace StaadSteelApp.Core.Interop
                 return true;
             }
 
-            if (ids.Length > SingleSelectionFallbackLimit)
-            {
-                error = !string.IsNullOrWhiteSpace(multipleError)
-                    ? multipleError
-                    : (!string.IsNullOrWhiteSpace(dynamicError)
-                        ? dynamicError
-                        : $"STAAD bulk selection failed for {ids.Length} items.");
-                return false;
-            }
-
-            int success = 0;
-            string lastError = !string.IsNullOrWhiteSpace(multipleError) ? multipleError : (dynamicError ?? string.Empty);
-            foreach (int id in ids)
-            {
-                if (ComInvoke.TryInvoke(geometry, singleMethodName, out result, out string singleError, new object[] { id }) &&
-                    IsSelectionSuccess(result))
-                {
-                    success++;
-                    continue;
-                }
-
-                if (!string.IsNullOrWhiteSpace(singleError))
-                    lastError = singleError;
-            }
-
-            if (success > 0)
-                return true;
-
-            error = string.IsNullOrWhiteSpace(lastError)
-                ? "STAAD selection could not be updated."
-                : lastError;
+            string detail = !string.IsNullOrWhiteSpace(multipleError) ? multipleError : dynamicError;
+            error = string.IsNullOrWhiteSpace(detail)
+                ? $"STAAD bulk selection failed for {ids.Length} items. No per-item fallback was used."
+                : $"STAAD bulk selection failed for {ids.Length} items. {detail}";
             return false;
         }
 

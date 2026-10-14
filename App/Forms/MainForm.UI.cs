@@ -50,7 +50,7 @@ namespace StaadSteelApp
                 lblH1.Text = type == "Circle" ? "Diam (YD)" : "YD";
                 lblH2.Text = "ZD";
             }
-            else if (type == "Tapered Tube")
+            else if (type == "Tapered Pipe" || type == "Tapered Tube")
             {
                 // d1, d2, th
                 txtBf.Visible = lblBf.Visible = false;
@@ -58,7 +58,29 @@ namespace StaadSteelApp
                 txtBfb.Visible = lblBfb.Visible = false;
                 txtTfb.Visible = lblTfb.Visible = false;
 
-                lblH1.Text = "Dep Start"; lblH2.Text = "Dep End"; lblTw.Text = "Thk";
+                if (type == "Tapered Pipe")
+                {
+                    lblH1.Text = "D1 (OD)";
+                    lblH2.Text = "D2 (OD)";
+                }
+                else
+                {
+                    lblH1.Text = "D1 (Side)";
+                    lblH2.Text = "D2 (Side)";
+                }
+
+                lblTw.Text = "TH (Thk)";
+            }
+            else if (type == "Trapezoidal")
+            {
+                txtTw.Visible = lblTw.Visible = false;
+                txtTf.Visible = lblTf.Visible = false;
+                txtBfb.Visible = lblBfb.Visible = false;
+                txtTfb.Visible = lblTfb.Visible = false;
+
+                lblH1.Text = "Depth (YD)";
+                lblH2.Text = "Top Width (ZD)";
+                lblBf.Text = "Bottom Width (ZB)";
             }
             else if (type == "Rectangle" || type == "GENERAL")
             {
@@ -304,6 +326,10 @@ namespace StaadSteelApp
                 // Rect-200x150
                 name = $"Rect-{h1:0}x{h2:0}";
             }
+            else if (type == "Trapezoidal")
+            {
+                name = $"Trap-{h1:0}x{h2:0}x{bf:0}";
+            }
              else if (type == "Tee")
              {
                  // T-300x200x10x15
@@ -325,13 +351,13 @@ namespace StaadSteelApp
              {
                  name = SectionNamingService.GenerateSectionName(eFramePropType.DbChannel, h1, h2, tw, bf, tf, bfb, tfb, dis);
              }
-             else if (type == "Tapered Tube")
+             else if (type == "Tapered Pipe" || type == "Tapered Tube")
              {
-                 // Tube-(300~400)x10
+                 string prefix = type == "Tapered Pipe" ? "Pipe" : "Tube";
                  if (Math.Abs(h1 - h2) > 0.1)
-                     name = $"Tube-({h1:0}~{h2:0})x{tw:0}";
+                     name = $"{prefix}-({h1:0}~{h2:0})x{tw:0}";
                 else
-                    name = $"Tube-{h1:0}x{tw:0}";
+                    name = $"{prefix}-{h1:0}x{tw:0}";
             }
             else if (type == "Tapered I" || type == "I")
             {

@@ -105,5 +105,13 @@ namespace StaadSteelApp.Core.Advance
 
             OpenStaadGeometryAdapter.TryHighlightBeams(geometry, beamIds, out _);
         }
+
+        internal static void HighlightNodes(object geometry, IReadOnlyList<int> nodeIds)
+        {
+            if (nodeIds == null || nodeIds.Count == 0)
+                return;
+
+            OpenStaadGeometryAdapter.TryHighlightNodes(geometry, nodeIds, out _);
+        }
     }
 }

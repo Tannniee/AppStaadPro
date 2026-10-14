@@ -39,3 +39,6 @@ ContourViewer/*.spec
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# --- Local release packages ---
+BUILD_RELEASE/

@@ -10,6 +10,7 @@ namespace StaadSteelApp
         public Func<int[]> GetSelectedNodes { get; set; }
         public Action ReloadSelection { get; set; }
         public Action UpdateHint { get; set; }
+        public Action UpdateActionUi { get; set; }
 
         public int[] CurrentSelection => GetSelectedNodes == null
             ? Array.Empty<int>()
@@ -33,6 +34,11 @@ namespace StaadSteelApp
         public void RequestHintUpdate()
         {
             UpdateHint?.Invoke();
+        }
+
+        public void RequestActionUiUpdate()
+        {
+            UpdateActionUi?.Invoke();
         }
     }
 

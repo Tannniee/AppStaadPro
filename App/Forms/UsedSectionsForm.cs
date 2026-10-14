@@ -14,6 +14,9 @@ namespace StaadSteelApp
         private bool _isBinding;
         private bool _locationInitialized;
         private bool _suppressLocationSave;
+        private string _boundModelDisplayName = string.Empty;
+        private string _connectionMessage = string.Empty;
+        private bool _connectionReady;
 
         public event EventHandler SectionActivated;
 
@@ -99,7 +102,7 @@ namespace StaadSteelApp
             try
             {
                 _lstSections.SetEntries(items);
-                _grpSections.Text = $"Used Sections ({items.Count})";
+                UpdateGroupCaption(items.Count);
 
                 var indicesToSelect = new List<int>();
                 int activeIndex = -1;
@@ -123,6 +126,55 @@ namespace StaadSteelApp
                 _lstSections.EndUpdate();
                 _isBinding = false;
             }
+        }
+
+        public void SetWaitingState(string message)
+        {
+            _boundModelDisplayName = string.Empty;
+            _connectionMessage = string.IsNullOrWhiteSpace(message)
+                ? "Activate a STAAD model..."
+                : message.Trim();
+            _connectionReady = false;
+            Text = "Used Sections - Waiting";
+            _lstSections.Enabled = false;
+            UpdateGroupCaption(0);
+        }
+
+        public void SetLoadingState(StaadModelIdentity identity)
+        {
+            _boundModelDisplayName = identity?.DisplayName ?? string.Empty;
+            _connectionMessage = "Loading used sections...";
+            _connectionReady = false;
+            Text = string.IsNullOrWhiteSpace(_boundModelDisplayName)
+                ? "Used Sections - Loading"
+                : "Used Sections - " + _boundModelDisplayName;
+            _lstSections.Enabled = false;
+            UpdateGroupCaption(0);
+        }
+
+        public void SetConnectedState(StaadModelIdentity identity, int itemCount)
+        {
+            _boundModelDisplayName = identity?.DisplayName ?? string.Empty;
+            _connectionMessage = string.Empty;
+            _connectionReady = true;
+            Text = string.IsNullOrWhiteSpace(_boundModelDisplayName)
+                ? "Used Sections"
+                : "Used Sections - " + _boundModelDisplayName;
+            _lstSections.Enabled = true;
+            UpdateGroupCaption(Math.Max(0, itemCount));
+        }
+
+        private void UpdateGroupCaption(int itemCount)
+        {
+            if (_connectionReady)
+            {
+                _grpSections.Text = $"Used Sections ({Math.Max(0, itemCount)})";
+                return;
+            }
+
+            _grpSections.Text = string.IsNullOrWhiteSpace(_connectionMessage)
+                ? "Activate a STAAD model..."
+                : _connectionMessage;
         }
 
         public void RestoreLocation(Point defaultLocation)

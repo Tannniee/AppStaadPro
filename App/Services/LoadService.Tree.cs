@@ -8,11 +8,19 @@ namespace StaadSteelApp.Core
     {
         public static IReadOnlyList<LoadTreeCase> GetPrimaryLoadTree()
         {
-            var loadCases = GetPrimaryLoadCases();
+            if (!TryGetOpenStaad(out object openStaad, out _))
+                return Array.Empty<LoadTreeCase>();
+
+            return GetPrimaryLoadTree(openStaad);
+        }
+
+        internal static IReadOnlyList<LoadTreeCase> GetPrimaryLoadTree(object openStaad)
+        {
+            var loadCases = GetPrimaryLoadCases(openStaad);
             if (loadCases.Count == 0)
                 return Array.Empty<LoadTreeCase>();
 
-            if (!TryGetLoadObject(out object loadObj, out _))
+            if (!TryGetLoadObject(openStaad, out object loadObj, out _))
                 return Array.Empty<LoadTreeCase>();
 
             var treeCases = new List<LoadTreeCase>(loadCases.Count);

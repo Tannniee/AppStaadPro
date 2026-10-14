@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using StaadSteelApp.Core.Interop;
@@ -17,11 +16,15 @@ namespace StaadSteelApp.Core.Advance
             if (!AdvanceOpenStaadService.TryGetOpenStaad(out object openStaad, out message))
                 return false;
 
+            if (!OpenStaadPropertyAdapter.TryGetPropertyObject(openStaad, out object propertyObj, out message))
+                return false;
+
             List<UsedSectionEntry> usedSections = SectionService.GetUsedSections(openStaad, forceRefresh: true);
             preview = new AdvanceSectionMergePreview
             {
                 TotalUsedSectionGroups = usedSections.Count
             };
+            var warnings = new StringBuilder();
 
             foreach (UsedSectionEntry entry in usedSections.OrderBy(item => item.DisplayText, StringComparer.OrdinalIgnoreCase))
             {
@@ -39,15 +42,47 @@ namespace StaadSteelApp.Core.Advance
                     continue;
                 }
 
-                preview.AddGroup(new AdvanceSectionMergeGroup
+                if (!AdvanceMemberAssignmentService.TryCapture(
+                        propertyObj,
+                        memberIds,
+                        out AdvanceMemberAssignmentSnapshot assignmentSnapshot,
+                        out string materialError))
                 {
-                    DisplayName = string.IsNullOrWhiteSpace(entry.DisplayText) ? ("PROP-" + propertyIds[0]) : entry.DisplayText,
-                    TargetPropertyId = propertyIds.Min(),
-                    PropertyIds = propertyIds,
-                    MemberIds = memberIds
-                });
+                    preview.UnsafeMaterialSectionGroupCount++;
+                    preview.UnsafeMaterialMemberCount += memberIds.Length;
+                    warnings.AppendLine($"{entry.DisplayText}: Material could not be read safely. {materialError}");
+                    continue;
+                }
+
+                int addedGroupCount = 0;
+                foreach (KeyValuePair<string, int[]> materialGroup in assignmentSnapshot.GetMaterialGroups())
+                {
+                    int[] materialPropertyIds = materialGroup.Value
+                        .Select(memberId => assignmentSnapshot.PropertyByMember[memberId])
+                        .Where(propertyId => propertyId > 0)
+                        .Distinct()
+                        .OrderBy(propertyId => propertyId)
+                        .ToArray();
+
+                    if (materialPropertyIds.Length <= 1)
+                        continue;
+
+                    preview.AddGroup(new AdvanceSectionMergeGroup
+                    {
+                        DisplayName = string.IsNullOrWhiteSpace(entry.DisplayText) ? ("PROP-" + materialPropertyIds[0]) : entry.DisplayText,
+                        TargetPropertyId = materialPropertyIds.Min(),
+                        MaterialName = materialGroup.Key,
+                        PropertyIds = materialPropertyIds,
+                        MemberIds = materialGroup.Value
+                    });
+                    addedGroupCount++;
+                }
+
+                if (addedGroupCount == 0)
+                    preview.UniqueSectionGroupCount++;
             }
 
+            preview.WarningText = warnings.ToString().Trim();
             message = BuildPreviewText(preview);
             return true;
         }
@@ -74,13 +109,24 @@ namespace StaadSteelApp.Core.Advance
 
             foreach (AdvanceSectionMergeGroup group in preview.Groups)
             {
-                int[] sourceMembers = GetMembersNotUsingTarget(propertyObj, group.MemberIds, group.TargetPropertyId);
+                if (!TryGetMembersNotUsingTarget(propertyObj, group, out int[] sourceMembers, out string sourceError))
+                {
+                    errors.AppendLine($"{group.DisplayName} [{group.MaterialName}]: {sourceError}");
+                    continue;
+                }
+
                 if (sourceMembers.Length == 0)
                     continue;
 
-                if (!TryAssignAndVerify(propertyObj, sourceMembers, group.TargetPropertyId, out string assignError))
+                if (!AdvanceMemberAssignmentService.TryReassignPropertyPreservingMaterial(
+                        propertyObj,
+                        sourceMembers,
+                        group.TargetPropertyId,
+                        group.MaterialName,
+                        out _,
+                        out string assignError))
                 {
-                    errors.AppendLine($"{group.DisplayName}: {assignError}");
+                    errors.AppendLine($"{group.DisplayName} [{group.MaterialName}]: {assignError}");
                     continue;
                 }
 
@@ -98,7 +144,7 @@ namespace StaadSteelApp.Core.Advance
                 return false;
             }
 
-            message = $"Merged {mergedMemberCount} members across {mergedGroupCount} section groups.";
+            message = $"Merged {mergedMemberCount} members across {mergedGroupCount} section groups. Material was preserved and verified.";
             if (!string.IsNullOrWhiteSpace(errorText))
                 message += "\n\nIssues:\n" + errorText;
 
@@ -122,87 +168,67 @@ namespace StaadSteelApp.Core.Advance
                 foreach (AdvanceSectionMergeGroup group in preview.Groups)
                 {
                     sb.AppendLine(
-                        $"- {group.DisplayName}: Ref {string.Join(", ", group.PropertyIds)} -> target Ref {group.TargetPropertyId}, {group.MemberIds.Count} members");
+                        $"- {group.DisplayName} [{group.MaterialName}]: Ref {string.Join(", ", group.PropertyIds)} -> target Ref {group.TargetPropertyId}, {group.MemberIds.Count} members");
                 }
             }
 
             sb.AppendLine();
             sb.AppendLine("Skipped:");
-            sb.AppendLine($"- Unique sections: {preview.UniqueSectionGroupCount} groups");
+            sb.AppendLine($"- No duplicate Ref IDs within one Material: {preview.UniqueSectionGroupCount} section groups");
+            sb.AppendLine($"- Material could not be preserved safely: {preview.UnsafeMaterialSectionGroupCount} groups, {preview.UnsafeMaterialMemberCount} members");
+
+            if (!string.IsNullOrWhiteSpace(preview.WarningText))
+            {
+                sb.AppendLine();
+                sb.AppendLine("Details:");
+                sb.AppendLine(preview.WarningText);
+            }
+
             return sb.ToString().TrimEnd();
         }
 
-        private static int[] GetMembersNotUsingTarget(object propertyObj, IEnumerable<int> memberIds, int targetPropertyId)
+        private static bool TryGetMembersNotUsingTarget(
+            object propertyObj,
+            AdvanceSectionMergeGroup group,
+            out int[] sourceMemberIds,
+            out string error)
         {
+            sourceMemberIds = Array.Empty<int>();
+            error = string.Empty;
             var result = new List<int>();
+            var errors = new StringBuilder();
+            var allowedPropertyIds = new HashSet<int>(group.PropertyIds ?? Array.Empty<int>());
 
-            foreach (int memberId in NormalizeIds(memberIds))
+            foreach (int memberId in NormalizeIds(group.MemberIds))
             {
                 if (!OpenStaadPropertyAdapter.TryGetBeamSectionPropertyRefNoFromProperty(
                         propertyObj,
                         memberId,
                         out int currentPropertyId,
-                        out string error))
+                        out string readError))
                 {
-                    Debug.WriteLine($"GetBeamSectionPropertyRefNo failed for member {memberId}: {error}");
+                    errors.AppendLine($"Member {memberId}: could not read section Ref ID. {readError}");
                     continue;
                 }
 
-                if (currentPropertyId != targetPropertyId)
+                if (!allowedPropertyIds.Contains(currentPropertyId))
+                {
+                    errors.AppendLine($"Member {memberId}: section changed to Ref {currentPropertyId}. Run Preview again.");
+                    continue;
+                }
+
+                if (currentPropertyId != group.TargetPropertyId)
                     result.Add(memberId);
             }
 
-            return result.ToArray();
-        }
-
-        private static bool TryAssignAndVerify(object propertyObj, int[] memberIds, int propertyId, out string error)
-        {
-            error = string.Empty;
-            bool bulkAccepted = OpenStaadPropertyAdapter.TryAssignBeamProperty(propertyObj, memberIds, propertyId, out string bulkError);
-            if (bulkAccepted && VerifyAssignedProperty(propertyObj, memberIds, propertyId))
-                return true;
-
-            int success = 0;
-            var errors = new StringBuilder();
-            if (!bulkAccepted && !string.IsNullOrWhiteSpace(bulkError))
-                errors.AppendLine("Bulk AssignBeamProperty failed: " + bulkError);
-
-            foreach (int memberId in memberIds)
+            string errorText = errors.ToString().Trim();
+            if (!string.IsNullOrWhiteSpace(errorText))
             {
-                if (OpenStaadPropertyAdapter.TryAssignBeamProperty(propertyObj, memberId, propertyId, out string singleError))
-                {
-                    success++;
-                    continue;
-                }
-
-                errors.AppendLine($"Member {memberId}: {singleError}");
+                error = errorText;
+                return false;
             }
 
-            if (success == memberIds.Length && VerifyAssignedProperty(propertyObj, memberIds, propertyId))
-                return true;
-
-            error = errors.ToString().Trim();
-            if (string.IsNullOrWhiteSpace(error))
-                error = $"Assignment verification failed for property {propertyId}.";
-
-            return false;
-        }
-
-        private static bool VerifyAssignedProperty(object propertyObj, int[] memberIds, int propertyId)
-        {
-            foreach (int memberId in memberIds.Take(Math.Min(memberIds.Length, 20)))
-            {
-                if (!OpenStaadPropertyAdapter.TryGetBeamSectionPropertyRefNoFromProperty(
-                        propertyObj,
-                        memberId,
-                        out int actualPropertyId,
-                        out _) ||
-                    actualPropertyId != propertyId)
-                {
-                    return false;
-                }
-            }
-
+            sourceMemberIds = result.ToArray();
             return true;
         }
 

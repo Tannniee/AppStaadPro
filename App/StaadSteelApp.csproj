@@ -8,6 +8,7 @@
     <Product>StaadSteelApp</Product>
     <AssemblyName>StaadSteelApp</AssemblyName>
     <RootNamespace>StaadSteelApp</RootNamespace>
+    <ApplicationIcon>Assets\StaadSteelApp.ico</ApplicationIcon>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
@@ -43,12 +44,6 @@
     </Compile>
     <Compile Update="Forms/AssignLoadForm.Designer.cs">
       <DependentUpon>AssignLoadForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms/CheckForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms/CheckForm.Designer.cs">
-      <DependentUpon>CheckForm.cs</DependentUpon>
     </Compile>
     <Compile Update="Forms/LoadTreeForm.cs">
       <SubType>Form</SubType>

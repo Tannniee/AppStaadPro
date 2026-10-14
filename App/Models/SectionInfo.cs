@@ -11,6 +11,7 @@ namespace StaadSteelApp.Core
         public string Material { get; set; }
 
         public eFramePropType PropType { get; set; }
+        public TaperedTubeShape TaperedTubeShape { get; set; }
         public double H1 { get; set; }
         public double H2 { get; set; }
         public double Tw { get; set; }
@@ -32,6 +33,10 @@ namespace StaadSteelApp.Core
         public double UptPy { get; set; }
         public double UptHss { get; set; }
         public double UptDee { get; set; }
+        public double UptR { get; set; }
+        public double UptCz { get; set; }
+        public double UptCy { get; set; }
+        public double UptXif { get; set; }
 
         public string ShapeName { get; set; }
         public int LegacyTypeSpec { get; set; }
@@ -68,6 +73,7 @@ namespace StaadSteelApp.Core
             return new SectionGeometry
             {
                 PropType = PropType,
+                TaperedTubeShape = TaperedTubeShape,
                 H1 = H1,
                 H2 = H2,
                 Tw = Tw,
@@ -84,6 +90,7 @@ namespace StaadSteelApp.Core
             if (geometry == null) return;
 
             PropType = geometry.PropType;
+            TaperedTubeShape = geometry.TaperedTubeShape;
             H1 = geometry.H1;
             H2 = geometry.H2;
             Tw = geometry.Tw;
@@ -109,7 +116,11 @@ namespace StaadSteelApp.Core
                 Pz = UptPz,
                 Py = UptPy,
                 Hss = UptHss,
-                Dee = UptDee
+                Dee = UptDee,
+                R = UptR,
+                Cz = UptCz,
+                Cy = UptCy,
+                Xif = UptXif
             };
         }
 
@@ -129,6 +140,10 @@ namespace StaadSteelApp.Core
             UptPy = properties.Py;
             UptHss = properties.Hss;
             UptDee = properties.Dee;
+            UptR = properties.R;
+            UptCz = properties.Cz;
+            UptCy = properties.Cy;
+            UptXif = properties.Xif;
         }
 
         public LegacySectionMetadata ToLegacyMetadata()

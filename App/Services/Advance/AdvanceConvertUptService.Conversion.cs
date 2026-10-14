@@ -1,19 +1,93 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using StaadSteelApp.Core.Interop;
 
 namespace StaadSteelApp.Core.Advance
 {
     internal static partial class AdvanceConvertUptService
     {
+        private static bool TryValidatePreviewGroup(
+            object propertyObj,
+            AdvanceUptConversionGroup group,
+            out string error)
+        {
+            error = string.Empty;
+            int[] memberIds = NormalizeIds(group?.MemberIds);
+            if (group == null || memberIds.Length == 0 ||
+                group.SourcePropertyRefByMember == null ||
+                group.SourcePropertyRefByMember.Count != memberIds.Length)
+            {
+                error = "Preview source data is incomplete. Run Preview again.";
+                return false;
+            }
+
+            foreach (int memberId in memberIds)
+            {
+                if (!group.SourcePropertyRefByMember.TryGetValue(memberId, out int expectedPropertyRef))
+                {
+                    error = $"Member {memberId} is missing its Preview source Ref ID. Run Preview again.";
+                    return false;
+                }
+
+                if (!OpenStaadPropertyAdapter.TryGetBeamSectionPropertyRefNoFromProperty(
+                        propertyObj,
+                        memberId,
+                        out int currentPropertyRef,
+                        out string propertyError))
+                {
+                    error = $"Could not recheck member {memberId}: {propertyError}";
+                    return false;
+                }
+
+                if (currentPropertyRef != expectedPropertyRef)
+                {
+                    error = $"Member {memberId} changed from Ref {expectedPropertyRef} to Ref {currentPropertyRef} after Preview. Run Preview again.";
+                    return false;
+                }
+            }
+
+            foreach (int propertyRef in group.SourcePropertyRefByMember.Values.Distinct().OrderBy(value => value))
+            {
+                if (!OpenStaadPropertyAdapter.TryGetSectionPropertyValuesExFromProperty(
+                        propertyObj,
+                        propertyRef,
+                        out int typeCode,
+                        out double[] props,
+                        out string valuesError))
+                {
+                    error = $"Could not recheck Ref {propertyRef}: {valuesError}";
+                    return false;
+                }
+
+                if (!TryBuildCandidate(
+                        typeCode,
+                        props,
+                        out ConversionCandidate currentCandidate,
+                        out _,
+                        out string candidateError))
+                {
+                    error = $"Ref {propertyRef} is no longer convertible. {candidateError} Run Preview again.";
+                    return false;
+                }
+
+                if (!string.Equals(currentCandidate.Key, group.SourceCandidateKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    error = $"Ref {propertyRef} dimensions changed after Preview. Run Preview again.";
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private static SectionInfo BuildSectionInfo(AdvanceUptConversionGroup group)
         {
             var info = new SectionInfo
             {
                 CreateAsUPT = true,
-                Name = group.UptPropertyName
+                Name = group.UptPropertyName,
+                Material = group.MaterialName
             };
 
             if (group.Shape == AdvanceUptConversionShape.Pipe)
@@ -32,57 +106,6 @@ namespace StaadSteelApp.Core.Advance
             info.Tf = group.ThicknessMm;
             info.Tw = group.ThicknessMm;
             return info;
-        }
-
-        private static bool TryAssignAndVerify(object propertyObj, int[] memberIds, int propertyId, out string error)
-        {
-            error = string.Empty;
-            bool bulkAccepted = OpenStaadPropertyAdapter.TryAssignBeamProperty(propertyObj, memberIds, propertyId, out string bulkError);
-            if (bulkAccepted && VerifyAssignedProperty(propertyObj, memberIds, propertyId))
-                return true;
-
-            int success = 0;
-            var errors = new StringBuilder();
-            if (!bulkAccepted && !string.IsNullOrWhiteSpace(bulkError))
-                errors.AppendLine("Bulk AssignBeamProperty failed: " + bulkError);
-
-            foreach (int memberId in memberIds)
-            {
-                if (OpenStaadPropertyAdapter.TryAssignBeamProperty(propertyObj, memberId, propertyId, out string singleError))
-                {
-                    success++;
-                    continue;
-                }
-
-                errors.AppendLine($"Member {memberId}: {singleError}");
-            }
-
-            if (success == memberIds.Length && VerifyAssignedProperty(propertyObj, memberIds, propertyId))
-                return true;
-
-            error = errors.ToString().Trim();
-            if (string.IsNullOrWhiteSpace(error))
-                error = $"Assignment verification failed for property {propertyId}.";
-
-            return false;
-        }
-
-        private static bool VerifyAssignedProperty(object propertyObj, int[] memberIds, int propertyId)
-        {
-            foreach (int memberId in memberIds.Take(Math.Min(memberIds.Length, 20)))
-            {
-                if (!OpenStaadPropertyAdapter.TryGetBeamSectionPropertyRefNoFromProperty(
-                        propertyObj,
-                        memberId,
-                        out int actualPropertyId,
-                        out _) ||
-                    actualPropertyId != propertyId)
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
         private static int CheckPropertyExists(object os, string name)

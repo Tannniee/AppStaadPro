@@ -29,13 +29,13 @@
             this.btnApplyAll = new System.Windows.Forms.Button();
             this.btnClean = new System.Windows.Forms.Button();
             this.btnMisc = new System.Windows.Forms.Button();
-            this.btnFindReplace = new System.Windows.Forms.Button();
             this.btnRun = new System.Windows.Forms.Button();
             this.btnAdvance = new System.Windows.Forms.Button();
             this.btnAssignLoad = new System.Windows.Forms.Button();
             this.btnHideSelected = new System.Windows.Forms.Button();
             this.btnViewSelected = new System.Windows.Forms.Button();
             this.btnGroups = new System.Windows.Forms.Button();
+            this.btnRatio = new System.Windows.Forms.Button();
             this.chkUPT = new System.Windows.Forms.CheckBox();
             this.chkUsedSections = new System.Windows.Forms.CheckBox();
             this.cboSeries = new System.Windows.Forms.ComboBox();
@@ -207,6 +207,7 @@
             "Tee",
             "Trapezoidal",
             "General",
+            "Tapered Pipe",
             "Tapered Tube",
             "Legacy"});
             this.cboType.Location = new System.Drawing.Point(63, 110);
@@ -245,19 +246,9 @@
             this.btnMisc.UseVisualStyleBackColor = true;
             this.btnMisc.Click += new System.EventHandler(this.btnMisc_Click);
             //
-            // btnFindReplace
-            //
-            this.btnFindReplace.Location = new System.Drawing.Point(15, 596);
-            this.btnFindReplace.Name = "btnFindReplace";
-            this.btnFindReplace.Size = new System.Drawing.Size(85, 30);
-            this.btnFindReplace.TabIndex = 13;
-            this.btnFindReplace.Text = "Check";
-            this.btnFindReplace.UseVisualStyleBackColor = true;
-            this.btnFindReplace.Click += new System.EventHandler(this.btnFindReplace_Click);
-            //
             // btnRun
             //
-            this.btnRun.Location = new System.Drawing.Point(106, 596);
+            this.btnRun.Location = new System.Drawing.Point(15, 596);
             this.btnRun.Name = "btnRun";
             this.btnRun.Size = new System.Drawing.Size(85, 30);
             this.btnRun.TabIndex = 15;
@@ -309,11 +300,21 @@
             //
             this.btnGroups.Location = new System.Drawing.Point(15, 664);
             this.btnGroups.Name = "btnGroups";
-            this.btnGroups.Size = new System.Drawing.Size(176, 30);
+            this.btnGroups.Size = new System.Drawing.Size(85, 30);
             this.btnGroups.TabIndex = 20;
             this.btnGroups.Text = "Group";
             this.btnGroups.UseVisualStyleBackColor = true;
             this.btnGroups.Click += new System.EventHandler(this.btnGroups_Click);
+            //
+            // btnRatio
+            //
+            this.btnRatio.Location = new System.Drawing.Point(106, 664);
+            this.btnRatio.Name = "btnRatio";
+            this.btnRatio.Size = new System.Drawing.Size(85, 30);
+            this.btnRatio.TabIndex = 23;
+            this.btnRatio.Text = "Ratio";
+            this.btnRatio.UseVisualStyleBackColor = true;
+            this.btnRatio.Click += new System.EventHandler(this.btnRatio_Click);
             //
             // chkUPT
             //
@@ -621,13 +622,13 @@
             this.Controls.Add(this.lblCode);
             this.Controls.Add(this.btnDetect);
             this.Controls.Add(this.btnDetectAll);
-            this.Controls.Add(this.btnFindReplace);
             this.Controls.Add(this.btnRun);
             this.Controls.Add(this.btnAdvance);
             this.Controls.Add(this.btnAssignLoad);
             this.Controls.Add(this.btnHideSelected);
             this.Controls.Add(this.btnViewSelected);
             this.Controls.Add(this.btnGroups);
+            this.Controls.Add(this.btnRatio);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
             this.Name = "MainForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
@@ -659,13 +660,13 @@
         private System.Windows.Forms.Button btnCopy;
         private System.Windows.Forms.Button btnPaste;
         private System.Windows.Forms.Button btnMisc;
-        private System.Windows.Forms.Button btnFindReplace;
         private System.Windows.Forms.Button btnRun;
         private System.Windows.Forms.Button btnAdvance;
         private System.Windows.Forms.Button btnAssignLoad;
         private System.Windows.Forms.Button btnHideSelected;
         private System.Windows.Forms.Button btnViewSelected;
         private System.Windows.Forms.Button btnGroups;
+        private System.Windows.Forms.Button btnRatio;
         private System.Windows.Forms.Button btnDetectAll;
         private System.Windows.Forms.CheckBox chkUPT;
         private System.Windows.Forms.CheckBox chkUsedSections;

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using StaadSteelApp.Core.Interop;
 
 namespace StaadSteelApp.Core
@@ -271,11 +270,7 @@ namespace StaadSteelApp.Core
 
         private static string GetUsedSectionsModelKey(object os)
         {
-            string staadFilePath = "";
-            if (os != null && TryGetStaadFilePath(os, out staadFilePath) && !string.IsNullOrWhiteSpace(staadFilePath))
-                return staadFilePath.Trim();
-
-            return "session:" + RuntimeHelpers.GetHashCode((object)os);
+            return StaadManager.GetModelCacheKey(os);
         }
 
         private static bool TryGetStaadFilePath(object os, out string staadFilePath)

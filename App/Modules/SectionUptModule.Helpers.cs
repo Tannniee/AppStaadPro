@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using StaadSteelApp.Core.Interop;
 
@@ -11,75 +12,102 @@ namespace StaadSteelApp.Core
         {
             if (!OpenStaadPropertyAdapter.TryGetPropertyObject(os, out object propObjForTables, out string propertyError))
                 throw new SectionPropertyException(propertyError);
-            int tableCount = OpenStaadPropertyAdapter.GetUserProvidedTableCount(propObjForTables, out _);
-            HashSet<int> existingIds = new HashSet<int>();
-            int preferredTableId = GetPreferredUPTTableId(targetType);
+
+            int tableCount = OpenStaadPropertyAdapter.GetUserProvidedTableCount(propObjForTables, out string countError);
+            if (tableCount < 0 || !string.IsNullOrWhiteSpace(countError))
+                throw new SectionPropertyException("Could not read the existing UPT table count: " + countError);
+
+            int[] existingTables = Array.Empty<int>();
 
             if (tableCount > 0)
             {
-                int[] existingTables = OpenStaadPropertyAdapter.TryGetUserProvidedTableList(propObjForTables, tableCount, out int[] tableIds, out _)
-                    ? tableIds
-                    : Array.Empty<int>();
+                if (!OpenStaadPropertyAdapter.TryGetUserProvidedTableList(
+                        propObjForTables,
+                        tableCount,
+                        out int[] tableIds,
+                        out string tableListError))
+                {
+                    throw new SectionPropertyException("Could not read the existing UPT table list: " + tableListError);
+                }
+
+                existingTables = tableIds
+                    .Where(tableId => tableId > 0)
+                    .Distinct()
+                    .OrderBy(tableId => tableId)
+                    .ToArray();
+
+                if (existingTables.Length != tableCount)
+                {
+                    throw new SectionPropertyException(
+                        $"OpenSTAAD reported {tableCount} UPT tables but returned {existingTables.Length} valid table IDs.");
+                }
 
                 foreach (int tableId in existingTables)
                 {
-                    existingIds.Add(tableId);
-                    if (TryGetUPTTableSectionType(propObjForTables, tableId, out int currentType) && currentType == targetType)
-                        return tableId;
+                    if (!OpenStaadPropertyAdapter.TryGetUserProvidedTableSectionType(
+                            propObjForTables,
+                            tableId,
+                            out int currentType,
+                            out string tableTypeError))
+                    {
+                        throw new SectionPropertyException(
+                            $"Could not read the section type of UPT table {tableId}: {tableTypeError}");
+                    }
 
-                    if (preferredTableId > 0 && tableId == preferredTableId)
+                    if (IsMatchingUPTTableType(currentType, targetType))
                         return tableId;
                 }
             }
 
-            if (preferredTableId > 0 && !existingIds.Contains(preferredTableId))
+            int newTableId = GetNextUPTTableId(existingTables);
+            if (!OpenStaadPropertyAdapter.TryCreateUPTTableEx(
+                    propObjForTables,
+                    newTableId,
+                    targetType,
+                    out string createError))
             {
-                OpenStaadPropertyAdapter.TryCreateUPTTableEx(propObjForTables, preferredTableId, targetType, out _);
-                return preferredTableId;
+                throw new SectionPropertyException(
+                    $"Could not create UPT table {newTableId} for table type {targetType}: {createError}");
             }
 
-            for (int newId = 1; newId <= 99; newId++)
-            {
-                if (!existingIds.Contains(newId))
-                {
-                    OpenStaadPropertyAdapter.TryCreateUPTTableEx(propObjForTables, newId, targetType, out _);
-                    return newId;
-                }
-            }
-
-            throw new SectionPropertyException("Maximum Number of UPT Tables (99) reached.");
+            return newTableId;
         }
 
-        private static int GetPreferredUPTTableId(int targetType)
+        private static bool IsMatchingUPTTableType(int reportedSectionType, int targetTableType)
         {
-            if (targetType >= 1 && targetType <= 10)
-                return targetType;
+            // CreateUPTTableEx accepts compact table types 1..10, while
+            // GetUserProvidedTableSectionType returns STAAD section codes
+            // 412, 422, ... 502. Some OpenSTAAD versions may return the
+            // compact value, so support both representations.
+            if (reportedSectionType == targetTableType)
+                return true;
 
-            return 0;
+            switch (targetTableType)
+            {
+                case 1: return reportedSectionType == 412; // Wide Flange
+                case 2: return reportedSectionType == 422; // Channel
+                case 3: return reportedSectionType == 432; // Angle
+                case 4: return reportedSectionType == 442; // Double Angle
+                case 5: return reportedSectionType == 452; // Tee
+                case 6: return reportedSectionType == 462; // Pipe
+                case 7: return reportedSectionType == 472; // Tube
+                case 8: return reportedSectionType == 482; // General
+                case 9: return reportedSectionType == 492; // ISECTION
+                case 10: return reportedSectionType == 502; // Prismatic
+                default: return false;
+            }
         }
 
-        private static int GetUPTTableSectionType(object property, int tableId)
+        private static int GetNextUPTTableId(int[] existingTables)
         {
-            if (OpenStaadPropertyAdapter.TryGetUserProvidedTableSectionType(property, tableId, out int sectionType, out string error))
-                return sectionType;
+            if (existingTables == null || existingTables.Length == 0)
+                return 1;
 
-            throw new StaadInteropException(error);
-        }
+            int maximumTableId = existingTables.Max();
+            if (maximumTableId == int.MaxValue)
+                throw new SectionPropertyException("Cannot create another UPT table because the table ID range is exhausted.");
 
-        private static bool TryGetUPTTableSectionType(object property, int tableId, out int sectionType)
-        {
-            sectionType = 0;
-
-            try
-            {
-                sectionType = GetUPTTableSectionType(property, tableId);
-                return sectionType > 0;
-            }
-            catch (Exception)
-            {
-                sectionType = 0;
-                return false;
-            }
+            return maximumTableId + 1;
         }
 
         private static bool IsUptSectionAddSuccess(object ret)
@@ -157,6 +185,59 @@ namespace StaadSteelApp.Core
             if (value > minimum) return value;
             if (fallback > minimum) return fallback;
             return minimum;
+        }
+
+        internal static double ComputeAnglePrincipalRadiusOfGyration(
+            double depth,
+            double width,
+            double thickness)
+        {
+            if (depth <= 0.0 || width <= 0.0 || thickness <= 0.0 ||
+                thickness >= Math.Min(depth, width))
+            {
+                return 0.0;
+            }
+
+            // Sharp-corner L-section = vertical leg + horizontal leg - overlap.
+            // OpenSTAAD's R input is the radius of gyration about the principal
+            // axis, so use the smaller principal centroidal moment: sqrt(Imin/A).
+            double verticalArea = thickness * depth;
+            double horizontalArea = width * thickness;
+            double overlapArea = thickness * thickness;
+            double area = verticalArea + horizontalArea - overlapArea;
+            if (area <= 0.0)
+                return 0.0;
+
+            double verticalX = thickness * 0.5;
+            double verticalY = depth * 0.5;
+            double horizontalX = width * 0.5;
+            double horizontalY = thickness * 0.5;
+            double overlapX = thickness * 0.5;
+            double overlapY = thickness * 0.5;
+
+            double centroidX = ((verticalArea * verticalX) + (horizontalArea * horizontalX) - (overlapArea * overlapX)) / area;
+            double centroidY = ((verticalArea * verticalY) + (horizontalArea * horizontalY) - (overlapArea * overlapY)) / area;
+
+            double ixx =
+                (thickness * Math.Pow(depth, 3) / 12.0) + (verticalArea * Math.Pow(verticalY - centroidY, 2))
+                + (width * Math.Pow(thickness, 3) / 12.0) + (horizontalArea * Math.Pow(horizontalY - centroidY, 2))
+                - ((thickness * Math.Pow(thickness, 3) / 12.0) + (overlapArea * Math.Pow(overlapY - centroidY, 2)));
+            double iyy =
+                (depth * Math.Pow(thickness, 3) / 12.0) + (verticalArea * Math.Pow(verticalX - centroidX, 2))
+                + (thickness * Math.Pow(width, 3) / 12.0) + (horizontalArea * Math.Pow(horizontalX - centroidX, 2))
+                - ((thickness * Math.Pow(thickness, 3) / 12.0) + (overlapArea * Math.Pow(overlapX - centroidX, 2)));
+            double ixy =
+                (verticalArea * (verticalX - centroidX) * (verticalY - centroidY))
+                + (horizontalArea * (horizontalX - centroidX) * (horizontalY - centroidY))
+                - (overlapArea * (overlapX - centroidX) * (overlapY - centroidY));
+
+            double average = 0.5 * (ixx + iyy);
+            double radius = Math.Sqrt(Math.Pow(0.5 * (ixx - iyy), 2) + (ixy * ixy));
+            double minimumPrincipalMoment = average - radius;
+            if (minimumPrincipalMoment <= 0.0)
+                return 0.0;
+
+            return Math.Sqrt(minimumPrincipalMoment / area);
         }
 
         private static double ComputeRectangularTorsionConstant(double depth, double width)

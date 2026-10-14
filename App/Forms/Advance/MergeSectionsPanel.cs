@@ -40,12 +40,12 @@ namespace StaadSteelApp
         public override AdvanceActionHint GetHint()
         {
             if (_preview == null)
-                return Info("Run Preview to find same-section groups split across multiple Ref IDs.");
+                return Info("Run Preview to find same-section, same-Material groups split across multiple Ref IDs.");
 
             if (_preview.DuplicateSectionGroupCount == 0)
                 return Error("Preview found no duplicate section groups to merge.");
 
-            return Info($"Preview ready: {_preview.DuplicateSectionGroupCount} duplicate groups, {_preview.DuplicateMemberCount} members.");
+            return Info($"Preview ready: {_preview.DuplicateSectionGroupCount} same-Material duplicate groups, {_preview.DuplicateMemberCount} members.");
         }
 
         public override bool Apply()
@@ -64,7 +64,7 @@ namespace StaadSteelApp
 
             DialogResult confirm = TopMostMessageBox.Show(
                 FindForm(),
-                $"Merge {_preview.DuplicateSectionGroupCount} duplicate section groups?\nUnused property Ref IDs will not be deleted.",
+                $"Merge {_preview.DuplicateSectionGroupCount} duplicate section groups?\nOnly groups with matching Material are merged. Unused Ref IDs remain in the model.",
                 "Merge Sections",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question);
@@ -105,7 +105,7 @@ namespace StaadSteelApp
 
                 _preview = preview;
                 _txtPreview.Text = message;
-                Context.ShowSuccess($"Preview complete. Duplicate groups: {_preview.DuplicateSectionGroupCount}.");
+                Context.ShowSuccess($"Preview complete. Same-Material duplicate groups: {_preview.DuplicateSectionGroupCount}.");
             }
             catch (Exception ex)
             {

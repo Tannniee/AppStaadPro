@@ -42,7 +42,6 @@ namespace StaadSteelApp.Core
                 case 612:
                 case 616:
                 case 670:
-                case 698:
                     h1mm = GetAt(props, 1, depth) * 1000.0;
                     bfmm = GetAt(props, 2, width) * 1000.0;
                     twmm = GetAt(props, 4, tw) * 1000.0;
@@ -50,6 +49,9 @@ namespace StaadSteelApp.Core
                     return FirstNonEmpty(
                         SectionNamingService.GenerateSectionName(eFramePropType.I, h1mm, h1mm, twmm, bfmm, tfmm, bfmm, tfmm, 0),
                         rawName);
+
+                case 698: // UPT ISECTION: Dww, Tww, Dww1, Bff, Tff, Bff1, Tff1, ...
+                    return BuildUptISectionDisplayName(props, rawName);
 
                 case 620:
                 case 673:
@@ -93,7 +95,6 @@ namespace StaadSteelApp.Core
 
                 case 650:
                 case 654:
-                case 675:
                     h1mm = GetAt(props, 1, depth) * 1000.0;
                     h2mm = GetAt(props, 2, width) * 1000.0;
                     tfmm = GetAt(props, 3, tf > 0 ? tf : tw) * 1000.0;
@@ -101,6 +102,18 @@ namespace StaadSteelApp.Core
                     return FirstNonEmpty(
                         SectionNamingService.GenerateSectionName(eFramePropType.Rectangular, h1mm, h2mm, twmm, 0, tfmm, 0, 0, 0),
                         rawName);
+
+                case 675:
+                    h1mm = GetAt(props, 4) * 1000.0;
+                    h2mm = GetAt(props, 5) * 1000.0;
+                    twmm = GetAt(props, 6) * 1000.0;
+                    int taperedTubeSectionType = (int)Math.Round(GetAt(props, 7));
+                    string taperedPrefix = taperedTubeSectionType == 1 ? "Pipe" :
+                        taperedTubeSectionType == 6 ? "Tube" : "TaperedTube";
+                    string taperedDepth = Math.Abs(h1mm - h2mm) > 0.1
+                        ? "(" + SectionNamingService.FmtNum(h1mm) + "~" + SectionNamingService.FmtNum(h2mm) + ")"
+                        : SectionNamingService.FmtNum(h1mm);
+                    return taperedPrefix + "-" + taperedDepth + "x" + SectionNamingService.FmtNum(twmm);
 
                 case 696:
                     h1mm = GetAt(props, 1, depth) * 1000.0;
@@ -179,6 +192,30 @@ namespace StaadSteelApp.Core
                 return primary;
 
             return fallback ?? "";
+        }
+
+        private static string BuildUptISectionDisplayName(double[] props, string rawName)
+        {
+            double h1mm = GetAt(props, 0) * 1000.0;
+            double twmm = GetAt(props, 1) * 1000.0;
+            double h2mm = GetAt(props, 2, GetAt(props, 0)) * 1000.0;
+            double bfmm = GetAt(props, 3) * 1000.0;
+            double tfmm = GetAt(props, 4) * 1000.0;
+            double bfbmm = GetAt(props, 5, GetAt(props, 3)) * 1000.0;
+            double tfbmm = GetAt(props, 6, GetAt(props, 4)) * 1000.0;
+
+            return FirstNonEmpty(
+                SectionNamingService.GenerateSectionName(
+                    eFramePropType.I,
+                    h1mm,
+                    h2mm,
+                    twmm,
+                    bfmm,
+                    tfmm,
+                    bfbmm,
+                    tfbmm,
+                    0),
+                rawName);
         }
 
         private static double ToDouble(object value)
